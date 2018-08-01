@@ -50,4 +50,4 @@ a = xr.DataArray(np.zeros((3, 2, 1, 1)), dims=['batches', 'cases', 'labels_oneho
 #     print(b.squeeze())
 
 a = a.squeeze(dim='asdf')
-print(a)
+print(a.size)
