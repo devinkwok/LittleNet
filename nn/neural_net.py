@@ -8,7 +8,6 @@ KEY_INPUT = 'inputs'
 KEY_OUTPUT = 'neurons'
 KEY_OUT_PRE = 'pre_activation'
 KEY_OUT_POST = 'post_activation'
-KEY_BATCH = 'batches'
 KEY_LABEL = 'labels'
 KEY_CASE = 'cases'
 
@@ -45,6 +44,15 @@ def sigmoid_d(np_array):
     e_a = np.exp(np_array)
     return np.divide(e_a, np.square(np.add(e_a, 1)))
 
+def accuracy_sum(test_onehot, goal_onehot, sum_along_dim=None):
+    return accuracy(test_onehot, goal_onehot).sum(dim=sum_along_dim)
+
+def accuracy(test_onehot, goal_onehot, sum_along_dim=None):
+    return test_onehot.argmax(dim=KEY_INPUT) == goal_onehot.argmax(dim=KEY_LABEL)
+
+def cost_mean_squared(test_onehot, goal_onehot, sum_along_dim=None):
+    return np.square(np.subtract(test_onehot, goal_onehot.rename({KEY_LABEL: KEY_INPUT}))).mean(dim=sum_along_dim)
+
 # tensor: an xarray.DataSet containing multiple instances of xarray.DataArray
 # parameters are of format 'name': dimensions, where dimension = 0 is a single variable per layer
 # dimension = 1 is layer size, dimension = 2 is previous layer size x layer size
@@ -73,13 +81,16 @@ class NeuralNet(object):
         if tsize != msize:
             raise ValueError('Size of \'' + KEY_INPUT + '\'=' + str(tsize) + ' does not match layer 0 size: ' + str(msize))
         
+        # ugly hack: remove coordinates for dimension 'inputs' if coordinates present
+        if KEY_INPUT in training_inputs.coords:
+            training_inputs = training_inputs.reset_index(KEY_INPUT, drop=True)
         activations = {mkey(0, KEY_OUT_PRE): training_inputs,
             mkey(0, KEY_OUT_POST): func_normalize(training_inputs)}
         for i in range(0, self.num_layers):
             pre_activation = np.add(xr.dot(activations[mkey(i, KEY_OUT_POST)], self.matrices[mkey(i, KEY_WEIGHT)],
                 dims=(KEY_INPUT, KEY_INPUT)), self.matrices[mkey(i, KEY_BIAS)])
-            activations[mkey(i+1, KEY_OUT_PRE)] = pre_activation.rename(neurons=KEY_INPUT)
-            activations[mkey(i+1, KEY_OUT_POST)] = self.func_activation(pre_activation).rename(neurons=KEY_INPUT)
+            activations[mkey(i+1, KEY_OUT_PRE)] = pre_activation.rename({KEY_OUTPUT: KEY_INPUT})
+            activations[mkey(i+1, KEY_OUT_POST)] = self.func_activation(pre_activation).rename({KEY_OUTPUT: KEY_INPUT})
         return activations
         # returns (num_layers + 1) layers with 2 matrices each, with and without activation function applied
 
@@ -89,15 +100,15 @@ class NeuralNet(object):
     # activations are the return value of pass_forward()
     def pass_back(self, activations, goal_label, func_loss_d=lambda output_v, goal_v: np.subtract(goal_v, output_v)):
         gradients = {}
-        partial_d = func_loss_d(activations[mkey(self.num_layers, KEY_OUT_POST)], goal_label.rename(labels=KEY_INPUT))
+        partial_d = func_loss_d(activations[mkey(self.num_layers, KEY_OUT_POST)], goal_label.rename({KEY_LABEL: KEY_INPUT}))
         for i in reversed(range(0, self.num_layers)):
-            activation_d = np.multiply(partial_d, self.func_activation_d(activations[mkey(i+1, KEY_OUT_PRE)])).rename(inputs=KEY_OUTPUT)
-            gradients[mkey(i, KEY_BIAS)] = activation_d # times 1, the bias's derivative
-            gradients[mkey(i, KEY_WEIGHT)] = np.multiply(activation_d, activations[mkey(i, KEY_OUT_POST)])  # times input
-            partial_d = xr.dot(activation_d, self.matrices[mkey(i, KEY_WEIGHT)], dims=(KEY_OUTPUT, KEY_OUTPUT))
+            partial_d = np.multiply(partial_d, self.func_activation_d(activations[mkey(i+1, KEY_OUT_PRE)])).rename({KEY_INPUT: KEY_OUTPUT})
+            gradients[mkey(i, KEY_BIAS)] = partial_d # times 1, the bias's derivative
+            gradients[mkey(i, KEY_WEIGHT)] = np.multiply(partial_d, activations[mkey(i, KEY_OUT_POST)])  # times input
+            partial_d = xr.dot(partial_d, self.matrices[mkey(i, KEY_WEIGHT)], dims=(KEY_OUTPUT, KEY_OUTPUT))
             # pre_activation = activations[mkey(i, KEY_OUT_PRE)]
         return gradients
-        # returns NeuralNet object containing gradients, same format as current NeuralNet but all parameters have additional dimension x m
+        # returns NeuralNet object containing gradients, same format as current NeuralNet but all parameters have additional dimension 'cases'
         
     def train(self, batch_inputs, batch_labels, training_rate=1.0):
         items = None
@@ -105,18 +116,13 @@ class NeuralNet(object):
             pass
         return items[0]
 
+    # iterable list of (label, xarray) for batch_inputs and batch_labels (use xr.groupby() to generate)
     def train_yield(self, batch_inputs, batch_labels, training_rate=1.0):
-        if not KEY_BATCH in batch_inputs.dims:
-            raise ValueError('Missing dimension \'' + KEY_BATCH + '\' in batch_inputs')
-        if not KEY_BATCH in batch_labels.dims:
-            raise ValueError('Missing dimension \'' + KEY_BATCH + '\' in batch_labels')
-        
         newNet = self
-        num_cases = batch_inputs.sizes[KEY_CASE]
-        for i, l in zip(batch_inputs.rolling(batches=1), batch_labels.rolling(batches=1)):
-            inputs = i[1].squeeze(dim=KEY_BATCH)
-            labels = l[1].squeeze(dim=KEY_BATCH)
+        for i, l in zip(batch_inputs, batch_labels):
+            inputs = i[1]
+            labels = l[1]
             gradients = self.pass_back(self.pass_forward(inputs), labels)
             for key in gradients.keys():
-                newNet.matrices[key] = np.add(newNet.matrices[key], np.multiply(gradients[key].sum(dim=KEY_CASE), training_rate / num_cases))
+                newNet.matrices[key] = np.add(newNet.matrices[key], np.multiply(gradients[key].mean(dim=KEY_CASE), training_rate))
             yield newNet, inputs, labels
