@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+import copy
 
 KEY_NET = 'net'
 KEY_WEIGHT = 'weights'
@@ -12,7 +13,15 @@ KEY_LABEL = 'labels'
 KEY_CASE = 'cases'
 
 def mkey(layer, argument_name):
-    return 'layer'+str(layer)+' '+argument_name
+    return 'layer' + str(layer) + ' ' + argument_name
+    
+def del_rows(xarray, del_dim, indexes):
+    row_nums = sorted(indexes)
+    new_rows = [xarray.isel({del_dim: slice(0, row_nums[0])})]
+    for i, j in zip(row_nums[:-1], row_nums[1:]):
+        new_rows.append(xarray.isel({del_dim: slice(i + 1, j)}))
+    new_rows.append(xarray.isel({del_dim: slice(row_nums[-1] + 1, xarray.sizes[del_dim])}))
+    return xr.concat(new_rows, dim=del_dim)
 
 # returns subset of dictionary of all keys containing contents in each of *keywords
 def dict_subset(dictionary, *keywords):
@@ -86,7 +95,7 @@ class NeuralNet(object):
             training_inputs = training_inputs.reset_index(KEY_INPUT, drop=True)
         activations = {mkey(0, KEY_OUT_PRE): training_inputs,
             mkey(0, KEY_OUT_POST): func_normalize(training_inputs)}
-        for i in range(0, self.num_layers):
+        for i in range(self.num_layers):
             pre_activation = np.add(xr.dot(activations[mkey(i, KEY_OUT_POST)], self.matrices[mkey(i, KEY_WEIGHT)],
                 dims=(KEY_INPUT, KEY_INPUT)), self.matrices[mkey(i, KEY_BIAS)])
             activations[mkey(i+1, KEY_OUT_PRE)] = pre_activation.rename({KEY_OUTPUT: KEY_INPUT})
@@ -101,7 +110,7 @@ class NeuralNet(object):
     def pass_back(self, activations, goal_label, func_loss_d=lambda output_v, goal_v: np.subtract(goal_v, output_v)):
         gradients = {}
         partial_d = func_loss_d(activations[mkey(self.num_layers, KEY_OUT_POST)], goal_label.rename({KEY_LABEL: KEY_INPUT}))
-        for i in reversed(range(0, self.num_layers)):
+        for i in reversed(range(self.num_layers)):
             partial_d = np.multiply(partial_d, self.func_activation_d(activations[mkey(i+1, KEY_OUT_PRE)])).rename({KEY_INPUT: KEY_OUTPUT})
             gradients[mkey(i, KEY_BIAS)] = partial_d # times 1, the bias's derivative
             gradients[mkey(i, KEY_WEIGHT)] = np.multiply(partial_d, activations[mkey(i, KEY_OUT_POST)])  # times input
@@ -126,3 +135,23 @@ class NeuralNet(object):
             for key in gradients.keys():
                 newNet.matrices[key] = np.add(newNet.matrices[key], np.multiply(gradients[key].mean(dim=KEY_CASE), training_rate))
             yield newNet, inputs, labels
+    
+    def delete_neurons(self, activations, neuron_indexes_per_layer):
+        new_net = copy.deepcopy(self)
+        for l, neurons in zip(range(self.num_layers), neuron_indexes_per_layer):
+            print(neurons)
+            new_net.matrices[mkey(l, KEY_WEIGHT)] = del_rows(
+                new_net.matrices[mkey(l, KEY_WEIGHT)], KEY_OUTPUT, neurons)
+            new_net.matrices[mkey(l, KEY_BIAS)] = del_rows(
+                new_net.matrices[mkey(l, KEY_BIAS)], KEY_OUTPUT, neurons)
+            if l + 1 < self.num_layers:
+                for n in neurons:
+                    bias = activations[mkey(l + 1, KEY_OUT_POST)].isel(
+                        inputs=n).mean(dim=KEY_CASE)
+                    bias_adjust = np.multiply(bias,
+                        new_net.matrices[mkey(l + 1, KEY_WEIGHT)].isel(inputs=n))
+                    new_net.matrices[mkey(l + 1, KEY_BIAS)] = np.add(
+                        new_net.matrices[mkey(l + 1, KEY_BIAS)], bias_adjust)
+                new_net.matrices[mkey(l + 1, KEY_WEIGHT)] = del_rows(
+                    new_net.matrices[mkey(l + 1, KEY_WEIGHT)], KEY_INPUT, neurons)
+        return new_net

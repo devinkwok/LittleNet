@@ -91,33 +91,62 @@ def test_compare():
             '\nLAYER', layer, 'BIASES:\nold:', old_output['b'][layer].tolist(),
             '\nnew:', output[mkey(layer, 'biases')].values.tolist(), '\n')
 
+def train_and_save_nn(net, inputs, labels, filename='/home/devin/d/data/src/abstraction/neural_net_v2/models/neuralnet-trained.pyc', batch_size=10, test_fraction=0.1, report_frequency=100):
+    num_cases = inputs.sizes['cases']
+    num_tests = int(num_cases * test_fraction)
+    num_batches = (num_cases - num_tests) / batch_size
+    test_inputs = inputs.isel(cases=slice(num_tests))
+    test_labels = labels.isel(cases=slice(num_tests))
+    train_inputs = inputs.isel(cases=slice(num_tests, num_cases)).groupby_bins('cases', num_batches)
+    train_labels = labels.isel(cases=slice(num_tests, num_cases)).groupby_bins('cases', num_batches)
+    count = 0
+    last_net = net
+    for newNet, i, l in net.train_yield(train_inputs, train_labels, training_rate=3.0):
+        if count % report_frequency == 0:
+            test_outputs = newNet.output_only(newNet.pass_forward(test_inputs))
+            print('number:', count * batch_size,
+                'accuracy:', nn.accuracy_sum(test_outputs, test_labels).values / num_tests,
+                'loss:', nn.cost_mean_squared(test_outputs, test_labels).values)
+        count += 1
+        last_net = newNet
+    utility.write_object(last_net, filename)
+    return last_net
+
 # accuracy should rise to approx. 90 (depends on random initialization), loss should reduce to < 0.02
 def test_mnist():
-    images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
+    inputs = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
     labels = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
-    images = utility.normalize(images)
-    NUM_CASES = images.shape[0]
-    BATCH_SIZE = 10
-    NUM_BATCHES = NUM_CASES / BATCH_SIZE
-    indexes = np.arange(NUM_CASES)
-    np.random.shuffle(indexes)
-    images = xr.DataArray(images, dims=('cases', 'inputs_x', 'inputs_y'), coords={'cases': indexes})
-    labels = xr.DataArray(labels, dims=('cases'), coords={'cases': indexes})
-    images = images.stack(inputs=('inputs_x', 'inputs_y'))
     labels = nn.make_onehot(labels, np.arange(10))
-    test_images = images.isel(cases=slice(100))
-    test_labels = labels.isel(cases=slice(100))
-    images = images.groupby_bins('cases', NUM_BATCHES)
-    labels = labels.groupby_bins('cases', NUM_BATCHES)
-    net = nn.NeuralNet((784, 30, 10))
-    count = 0
-    for newNet, i, l in net.train_yield(images, labels):
-        if count % 100 == 0:
-            test_outputs = newNet.output_only(newNet.pass_forward(test_images))
-            print('number:', count*BATCH_SIZE, 'accuracy:', nn.accuracy_sum(test_outputs, test_labels).values, 'loss:', nn.cost_mean_squared(test_outputs, test_labels).values)
-        count += 1
 
-test_2in_1out()
-test_1in_1out()
-test_compare()
+    indexes = np.arange(60000)
+    net = nn.NeuralNet((784, 30, 10))
+    for x in range(10):
+        np.random.shuffle(indexes)
+        inputs = inputs.isel(cases=indexes)
+        labels = labels.isel(cases=indexes)
+        net = train_and_save_nn(net, inputs, labels)
+    
+def test_mnist_with_random_images():
+    inputs = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
+    labels = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
+    labels = nn.make_onehot(labels, np.arange(10))
+
+    random_inputs = utility.shuffle_pixels(inputs).isel(cases=slice(30000)).assign_coords(cases=np.arange(60000,90000))
+    random_labels = nn.make_onehot(xr.DataArray(np.full((30000), None), dims=('cases'), coords={'cases': np.arange(60000,90000)}), np.arange(10))
+    inputs = xr.concat([inputs, random_inputs], dim='cases')
+    labels = xr.concat([labels, random_labels], dim='cases')
+
+    indexes = np.arange(90000)
+    net = nn.NeuralNet((784, 30, 10))
+    for x in range(10):
+        np.random.shuffle(indexes)
+        inputs = inputs.isel(cases=indexes)
+        labels = labels.isel(cases=indexes)
+        net = train_and_save_nn(net, inputs, labels)
+
+
+# test_2in_1out()
+# test_1in_1out()
+# test_compare()
 test_mnist()
+# test_mnist_with_random_images()

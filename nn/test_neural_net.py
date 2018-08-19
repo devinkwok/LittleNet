@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import unittest
 import math
 
-from nn.neural_net import mkey, sigmoid, sigmoid_d, dict_subset, make_onehot, accuracy, accuracy_sum, cost_mean_squared, NeuralNet
+from nn.neural_net import mkey, sigmoid, sigmoid_d, dict_subset, del_rows, \
+    make_onehot, accuracy, accuracy_sum, cost_mean_squared, NeuralNet
 
 
 LAYER_SIZES = [10, 5, 2]
@@ -34,6 +35,13 @@ class NeuralNetTest(unittest.TestCase):
         for i, name in zip(layer_numbers, names):
             self.assertEqual(mkey(i, name), 'layer' + str(i) + ' ' + name)
     
+    def test_del_rows(self):
+        arr = xr.DataArray(np.arange(12).reshape((4, 3)), dims=('inputs', 'neurons'))
+        arr = del_rows(arr, 'inputs', [0, 2])
+        arr = del_rows(arr, 'neurons', [2])
+        self.assertDictEqual(dict(arr.sizes), {'inputs': 2, 'neurons': 2})
+        np.testing.assert_array_equal(arr, [[3, 4], [9, 10]])
+
     def test_dict_subset(self):
         test_dict = {}
         for i in range(NUM_LAYERS):
@@ -180,6 +188,18 @@ class NeuralNetTest(unittest.TestCase):
         # for key in trained.matrices.keys():
         #     self.assertTrue(np.all(np.greater(gradient[key].isel(cases=0), 0), trained.matrices[key].less(0)))
         #     self.assertTrue(np.all(np.less(gradient[key].isel(cases=0), 0), trained.matrices[key].greater(0)))
+
+    def test_delete_neurons(self):
+        net = NeuralNet(LAYER_SIZES, func_fill=np.ones)
+        inputs = xr.DataArray(np.zeros((NUM_CASES, INPUT_SIZE)), dims=['cases', 'inputs'])
+        activations = net.pass_forward(inputs)
+        new_net = net.delete_neurons(activations, [[3, 1], [0]])
+        print(new_net.matrices)
+        sizes = [x for x in LAYER_SIZES]
+        sizes[1] -= 2
+        sizes[2] -= 1
+        self.assert_dimensions(new_net.matrices, 'weights', {'inputs': sizes[:-1], 'neurons': sizes[1:]})
+        self.assertEqual(new_net.matrices[mkey(1, 'biases')][0], activations[mkey(1, 'post_activation')][0,0] * 2 + 1)
 
 if __name__ == '__main__':
     unittest.main()

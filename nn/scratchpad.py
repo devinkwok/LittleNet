@@ -42,20 +42,13 @@ training_set = xr.Dataset(
 # # for property, value in vars(x.coords).items():
 # #     print ('asdf', property, ": ", value)
 # # [print(x.coords, y.coords) for x,y in aa]
+coords = {'inputs-x': np.arange(3), 'inputs-y': np.arange(2)}
+a = xr.DataArray(np.arange(24).reshape((4, 3, 2)), dims=['cases', *coords], coords=coords)
+b_coords = {'neurons': np.arange(2)}
+b = xr.DataArray(np.arange(12).reshape(3, 2, 2), dims=[*coords, 'neurons1'], coords=coords)
+c = xr.dot(a, b, dims=('inputs-x', 'inputs-y'))
+d = xr.dot(c, b, dims=('neurons1'))
+print(c, d)
 
-a = xr.DataArray(np.arange(6).reshape((3,2, 1)), dims=['cases', 'labels_onehot', 'asdf'])
-# # a = training_set['training_inputs']
-# a = a.rolling(batches=1)
-# for x, b in a:
-#     print(b.squeeze())
-a = a.squeeze()
-b = a
-print(a, b)
-a = a.assign_coords(cases=[3, 1, 2])
-a = a.reset_index('cases', drop=True)
-print(xr.dot(a,b, dims='cases'))
-# a = list(a.groupby_bins('cases', 3))
-print(a, b)
-# [print(x[1].max()) for x in a]
-c = a.sum()
-print(c.values)
+shape = [1,2,3]
+print(np.zeros(shape))
