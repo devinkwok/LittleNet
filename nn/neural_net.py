@@ -56,8 +56,11 @@ def sigmoid_d(np_array):
 def accuracy_sum(test_onehot, goal_onehot, sum_along_dim=None):
     return accuracy(test_onehot, goal_onehot).sum(dim=sum_along_dim)
 
-def accuracy(test_onehot, goal_onehot, sum_along_dim=None):
-    return test_onehot.argmax(dim=KEY_INPUT) == goal_onehot.argmax(dim=KEY_LABEL)
+def accuracy(test_onehot, goal_onehot, threshold=0.5):
+    by_threshold = np.logical_and(np.less(test_onehot.max(dim=KEY_INPUT), threshold),
+        np.less_equal(goal_onehot.max(dim=KEY_LABEL), 0))
+    by_max_value = test_onehot.argmax(dim=KEY_INPUT) == goal_onehot.argmax(dim=KEY_LABEL)
+    return np.logical_or(by_threshold, by_max_value)
 
 def cost_mean_squared(test_onehot, goal_onehot, sum_along_dim=None):
     return np.square(np.subtract(test_onehot, goal_onehot.rename({KEY_LABEL: KEY_INPUT}))).mean(dim=sum_along_dim)
@@ -119,27 +122,31 @@ class NeuralNet(object):
         return gradients
         # returns NeuralNet object containing gradients, same format as current NeuralNet but all parameters have additional dimension 'cases'
         
-    def train(self, batch_inputs, batch_labels, training_rate=1.0):
+    def train(self, batch_inputs, batch_labels, training_rate=1.0, deep_copy=False):
         items = None
         for items in self.train_yield(batch_inputs, batch_labels, training_rate):
             pass
         return items[0]
 
     # iterable list of (label, xarray) for batch_inputs and batch_labels (use xr.groupby() to generate)
-    def train_yield(self, batch_inputs, batch_labels, training_rate=1.0):
-        newNet = self
+    def train_yield(self, batch_inputs, batch_labels, training_rate=1.0, deep_copy=True):
+        new_net = self
+        if deep_copy:
+            new_net = copy.deepcopy(self)
         for i, l in zip(batch_inputs, batch_labels):
             inputs = i[1]
             labels = l[1]
-            gradients = self.pass_back(self.pass_forward(inputs), labels)
+            gradients = new_net.pass_back(new_net.pass_forward(inputs), labels)
             for key in gradients.keys():
-                newNet.matrices[key] = np.add(newNet.matrices[key], np.multiply(gradients[key].mean(dim=KEY_CASE), training_rate))
-            yield newNet, inputs, labels
+                new_net.matrices[key] = np.add(new_net.matrices[key],
+                    np.multiply(gradients[key].mean(dim=KEY_CASE), training_rate))
+            yield new_net, inputs, labels
     
     def delete_neurons(self, activations, neuron_indexes_per_layer):
         new_net = copy.deepcopy(self)
         for l, neurons in zip(range(self.num_layers), neuron_indexes_per_layer):
-            print(neurons)
+            if len(neurons) == 0:
+                continue
             new_net.matrices[mkey(l, KEY_WEIGHT)] = del_rows(
                 new_net.matrices[mkey(l, KEY_WEIGHT)], KEY_OUTPUT, neurons)
             new_net.matrices[mkey(l, KEY_BIAS)] = del_rows(
@@ -155,3 +162,9 @@ class NeuralNet(object):
                 new_net.matrices[mkey(l + 1, KEY_WEIGHT)] = del_rows(
                     new_net.matrices[mkey(l + 1, KEY_WEIGHT)], KEY_INPUT, neurons)
         return new_net
+
+    def __repr__(self):
+        string_out = 'Neural net '
+        for key, value in self.matrices.items():
+            string_out += key + ' ' + repr(value.sizes)
+        return string_out

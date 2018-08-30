@@ -136,4 +136,6 @@ def test():
     out, outputs = layer2.pass_forward(inputs)
     gradients = layer0.pass_back(labels, outputs)
 
-test()
+
+if __name__ == '__main__':
+    test()

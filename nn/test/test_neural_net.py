@@ -1,7 +1,6 @@
 import numpy as np
 import random, string
 import xarray as xr
-import matplotlib.pyplot as plt
 import unittest
 import math
 
@@ -20,6 +19,17 @@ SIGMOID_D_OUTPUT = np.array([0.25, 0.196611933, 0.196611933])
 EXPECTED_OUTPUT = 1./(1.+math.pow(math.e, -1*(LAYER_SIZES[1] * 1 / (1 + math.pow(math.e, -1)) + 1)))
 
 class NeuralNetTest(unittest.TestCase):
+
+    def assert_nn_equal(self, net1, net2):
+        self.assertEqual(set(net1.matrices.keys()), set(net2.matrices.keys()))
+        for k in net1.matrices.keys():
+            np.testing.assert_allclose(net1.matrices[k], net2.matrices[k])
+
+    def nn_not_equal(self, net1, net2):
+        if set(net1.matrices.keys()) != set(net2.matrices.keys()):
+            return True
+        return not np.all([np.all(np.equal(
+            net1.matrices[k], net2.matrices[k])) for k in net1.matrices.keys()])
 
     def assert_dimensions(self, matrices_dict, matrix_keyword, reference_dict_arrays):
         for i in range(NUM_LAYERS):
@@ -100,9 +110,9 @@ class NeuralNetTest(unittest.TestCase):
         np.testing.assert_array_equal(accuracy_sum(test_onehot, goal_onehot), 1)
 
     def test_accuracy(self):
-        test_onehot = xr.DataArray([[0, 0.5], [0.5, 0]], dims=('cases', 'inputs'))
-        goal_onehot = xr.DataArray([[0, 1], [0, 1]], dims=('cases', 'labels'))
-        expected = xr.DataArray([True, False], dims='cases')
+        test_onehot = xr.DataArray([[0, 0.6], [0.6, 0], [0.4, 0], [0, 0.4]], dims=('cases', 'inputs'))
+        goal_onehot = xr.DataArray([[0, 1], [0, 1], [0, 1], [0, 0]], dims=('cases', 'labels'))
+        expected = xr.DataArray([True, False, False, True], dims='cases')
         actual = accuracy(test_onehot, goal_onehot)
         np.testing.assert_array_equal(expected, actual)
         self.assertEqual(actual.sum(), expected.sum())
@@ -176,6 +186,8 @@ class NeuralNetTest(unittest.TestCase):
     
     def test_train(self):
         net = NeuralNet(LAYER_SIZES, func_fill=np.ones)
+        net2 = NeuralNet(LAYER_SIZES, func_fill=np.ones)
+        self.assert_nn_equal(net, net2)
         NUM_BATCHES = 4
         inputs = xr.DataArray(np.zeros((NUM_BATCHES * NUM_CASES, INPUT_SIZE)), dims=['cases', 'inputs'])
         labels = make_onehot(xr.DataArray(np.zeros((NUM_BATCHES * NUM_CASES,)), dims=['cases']), np.zeros(NUM_LABELS))
@@ -184,7 +196,9 @@ class NeuralNetTest(unittest.TestCase):
         trained = net.train(list(inputs), list(labels))
         self.assert_dimensions(trained.matrices, 'weights', {'inputs':LAYER_SIZES[:-1], 'neurons':LAYER_SIZES[1:]})
         self.assert_dimensions(trained.matrices, 'biases', {'neurons':LAYER_SIZES[1:]})
-        gradient = net.pass_back(net.pass_forward(inputs.first()), labels.first())
+        self.assertTrue(self.nn_not_equal(net, trained))
+
+        # gradient = net.pass_back(net.pass_forward(inputs.first()), labels.first())
         # for key in trained.matrices.keys():
         #     self.assertTrue(np.all(np.greater(gradient[key].isel(cases=0), 0), trained.matrices[key].less(0)))
         #     self.assertTrue(np.all(np.less(gradient[key].isel(cases=0), 0), trained.matrices[key].greater(0)))
@@ -194,7 +208,6 @@ class NeuralNetTest(unittest.TestCase):
         inputs = xr.DataArray(np.zeros((NUM_CASES, INPUT_SIZE)), dims=['cases', 'inputs'])
         activations = net.pass_forward(inputs)
         new_net = net.delete_neurons(activations, [[3, 1], [0]])
-        print(new_net.matrices)
         sizes = [x for x in LAYER_SIZES]
         sizes[1] -= 2
         sizes[2] -= 1
