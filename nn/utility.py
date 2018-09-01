@@ -9,7 +9,10 @@ import xarray as xr
 import neural_net as nn
 
 def read_all_objects(directory, pattern):
-    return [(os.path.split(filename)[1], read_object(filename)) for filename in glob.glob(directory + pattern + '.pyc')]
+    objs = []
+    for filename in glob.glob(directory + pattern + '.pyc'):
+        objs.append((os.path.split(filename)[1], read_object(filename)))
+    return objs
 
 def read_idx_images(filename):
     with open(filename, 'rb') as f:
@@ -134,8 +137,9 @@ def tile_kernel(np_kernel, fill_dims=(28, 28), stride=(4,4)):
             tiles.append(kernel.roll(inputs_y=i, inputs_x=j))
     return xr.concat(tiles, 'neurons').stack(inputs=('inputs_y', 'inputs_x'))
 
-def plot_layer_weights(neural_net):
-    weights = neural_net.matrices[nn.mkey(0, 'weights')]
+def plot_layer_weights(neural_net, layer=0):
+    weights = neural_net.matrices[nn.mkey(layer, 'weights')]
+    #TODO: plot higher layer weights
     weights = xr.DataArray(weights.values.reshape((28, 28, weights.sizes['neurons'])),
         dims=('inputs_y', 'inputs_x', 'neurons'))
     weights.plot(x='inputs_x', y='inputs_y', col='neurons', col_wrap=10)

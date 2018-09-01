@@ -37,7 +37,7 @@ def tile_shuffled_cases(*xr_arrays, tile_size=0, tile_dim='cases'):
 def evaluate_net(net, test_inputs, test_labels, num=0, do_print=True):
     if do_print:
         print('    testing', num, '... ', end='')
-    test_outputs = net.output_only(net.pass_forward(test_inputs))
+    test_outputs = net.pass_forward_output_only(test_inputs)
     accuracy = nn.accuracy_sum(test_outputs, test_labels).values / test_inputs.sizes['cases']
     # multiply by 1 to convert from array to float
     loss = nn.cost_mean_squared(test_outputs, test_labels).values * 1

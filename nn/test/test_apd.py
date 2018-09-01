@@ -44,6 +44,15 @@ class ApdTest(unittest.TestCase):
              [[0, 0.2, 0.8, 0], [0, 0, 0.9, 0.1]],
              [[0, 0, 0.6, 0.4], [0, 0, 0.3, 0.7]]])
 
+    #TODO: remove this
+    def test_apd_in_chunks(self):
+        NUM_BUCKETS = 4
+        activations = xr.DataArray(np.arange(0, 1.0, 0.05).reshape((10,2)), dims=('cases', 'inputs'))
+        apds = apd.merge(apd.apd_raw(activations, num_buckets=NUM_BUCKETS), 'cases')
+        apds2 = apd.apd_in_chunks(activations, chunk_size=2, num_buckets=NUM_BUCKETS)
+        self.assertDictEqual(dict(apds.sizes), dict(apds2.sizes))
+        np.testing.assert_allclose(apds, apds2)
+
     def test_apd_area(self):
         apds = xr.DataArray([[1, 0, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0], [0, 0, 0, 1]],
             dims=('cases', 'histogram_buckets'))

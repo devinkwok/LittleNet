@@ -100,14 +100,15 @@ class NeuralNet(object):
             mkey(0, KEY_OUT_POST): func_normalize(training_inputs)}
         for i in range(self.num_layers):
             pre_activation = np.add(xr.dot(activations[mkey(i, KEY_OUT_POST)], self.matrices[mkey(i, KEY_WEIGHT)],
-                dims=(KEY_INPUT, KEY_INPUT)), self.matrices[mkey(i, KEY_BIAS)])
+                dims=(KEY_INPUT)), self.matrices[mkey(i, KEY_BIAS)])
             activations[mkey(i+1, KEY_OUT_PRE)] = pre_activation.rename({KEY_OUTPUT: KEY_INPUT})
             activations[mkey(i+1, KEY_OUT_POST)] = self.func_activation(pre_activation).rename({KEY_OUTPUT: KEY_INPUT})
         return activations
         # returns (num_layers + 1) layers with 2 matrices each, with and without activation function applied
 
-    def output_only(self, pass_forward):
-        return pass_forward[mkey(self.num_layers, KEY_OUT_POST)]
+    def pass_forward_output_only(self, training_inputs, func_normalize=lambda x: x):
+        return self.pass_forward(training_inputs,
+            func_normalize=func_normalize)[mkey(self.num_layers, KEY_OUT_POST)]
 
     # activations are the return value of pass_forward()
     def pass_back(self, activations, goal_label, func_loss_d=lambda output_v, goal_v: np.subtract(goal_v, output_v)):
@@ -117,7 +118,7 @@ class NeuralNet(object):
             partial_d = np.multiply(partial_d, self.func_activation_d(activations[mkey(i+1, KEY_OUT_PRE)])).rename({KEY_INPUT: KEY_OUTPUT})
             gradients[mkey(i, KEY_BIAS)] = partial_d # times 1, the bias's derivative
             gradients[mkey(i, KEY_WEIGHT)] = np.multiply(partial_d, activations[mkey(i, KEY_OUT_POST)])  # times input
-            partial_d = xr.dot(partial_d, self.matrices[mkey(i, KEY_WEIGHT)], dims=(KEY_OUTPUT, KEY_OUTPUT))
+            partial_d = xr.dot(partial_d, self.matrices[mkey(i, KEY_WEIGHT)], dims=(KEY_OUTPUT))
             # pre_activation = activations[mkey(i, KEY_OUT_PRE)]
         return gradients
         # returns NeuralNet object containing gradients, same format as current NeuralNet but all parameters have additional dimension 'cases'
@@ -142,7 +143,7 @@ class NeuralNet(object):
                     np.multiply(gradients[key].mean(dim=KEY_CASE), training_rate))
             yield new_net, inputs, labels
     
-    def delete_neurons(self, activations, neuron_indexes_per_layer):
+    def delete_neurons(self, neuron_indexes_per_layer, activations=None):
         new_net = copy.deepcopy(self)
         for l, neurons in zip(range(self.num_layers), neuron_indexes_per_layer):
             if len(neurons) == 0:
@@ -152,13 +153,14 @@ class NeuralNet(object):
             new_net.matrices[mkey(l, KEY_BIAS)] = del_rows(
                 new_net.matrices[mkey(l, KEY_BIAS)], KEY_OUTPUT, neurons)
             if l + 1 < self.num_layers:
-                for n in neurons:
-                    bias = activations[mkey(l + 1, KEY_OUT_POST)].isel(
-                        inputs=n).mean(dim=KEY_CASE)
-                    bias_adjust = np.multiply(bias,
-                        new_net.matrices[mkey(l + 1, KEY_WEIGHT)].isel(inputs=n))
-                    new_net.matrices[mkey(l + 1, KEY_BIAS)] = np.add(
-                        new_net.matrices[mkey(l + 1, KEY_BIAS)], bias_adjust)
+                if not activations is None:
+                    for n in neurons:
+                        bias = activations[mkey(l + 1, KEY_OUT_POST)].isel(
+                            inputs=n).mean(dim=KEY_CASE)
+                        bias_adjust = np.multiply(bias,
+                            new_net.matrices[mkey(l + 1, KEY_WEIGHT)].isel(inputs=n))
+                        new_net.matrices[mkey(l + 1, KEY_BIAS)] = np.add(
+                            new_net.matrices[mkey(l + 1, KEY_BIAS)], bias_adjust)
                 new_net.matrices[mkey(l + 1, KEY_WEIGHT)] = del_rows(
                     new_net.matrices[mkey(l + 1, KEY_WEIGHT)], KEY_INPUT, neurons)
         return new_net

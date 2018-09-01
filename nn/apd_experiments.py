@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -15,7 +16,7 @@ def experiment_dapd_by_label(activation_layer, labels):
     dapd = apd.diff_by_label(activation_layer, labels)
     dapd = apd.apd_area(dapd)
     try:
-        dapd.unstack('inputs')
+        dapd = dapd.unstack('inputs')
         dapd.plot(x='inputs_x', y='inputs_y', col='labels', col_wrap=5)
     except:
         dapd.plot(x='labels', y='inputs')
@@ -36,14 +37,13 @@ def experiment_dapd_by_neuron_pairs(activation_layer, labels):
 
 def dead_neuron_indexes(activation_layer, labels, threshold=0.01):
     costs = apd.cost(apd.apd_area(apd.diff_by_label(activation_layer, labels)), 'labels')
-    print(costs)
     return np.where(costs < threshold)[0]
 
 def prune_dead_neurons(net, activations, labels, threshold=0.01):
     indexes = [i for i in apply_to_all_layers(net, activations,
         lambda x: dead_neuron_indexes(x, labels, threshold=threshold))]
     print('DELETED neurons:', indexes)
-    return net.delete_neurons(activations, indexes)
+    return net.delete_neurons(indexes, activations=activations)
 
 def test_net(net, images, labels):
     activations = net.pass_forward(images)
@@ -56,8 +56,115 @@ def test_net(net, images, labels):
     # [x for x in apply_to_all_layers(pruned_net, pruned_activations,
     #     lambda x:experiment_dapd_by_neuron_pairs(x, labels))]
 
-def inputs_activations(inputs, labels):
-    dapd = experiment_dapd_by_label(inputs, labels)
+def build_10x1_input_apd_net(dapd_by_labels):
+    net = nn.NeuralNet((784, 10), func_fill=np.zeros)
+    dapd = (dapd_by_labels / 2).stack(inputs=('inputs_y', 'inputs_x')).rename(
+        labels='neurons').transpose('inputs', 'neurons').reset_index('inputs', drop=True)
+    net.matrices[nn.mkey(0, 'weights')] = dapd
+    return net
+
+def build_10x10_input_apd_net(dapd_by_labels):
+    net = nn.NeuralNet((784, 10, 10), func_fill=np.zeros)
+    dapd = (dapd_by_labels / 2).stack(inputs=('inputs_y', 'inputs_x')).rename(
+        labels='neurons').transpose('inputs', 'neurons').reset_index('inputs', drop=True)
+    net.matrices[nn.mkey(0, 'weights')] = dapd
+    return net
+
+#TODO
+def build_30x10_probability_apd_net(dapd_by_labels):
+    net = nn.NeuralNet((784, 10, 10), func_fill=np.zeros)
+    dapd = dapd_by_labels / 2
+    dapd = dapd.stack(inputs=('inputs_y', 'inputs_x')).rename(
+        labels='neurons').transpose('inputs', 'neurons').reset_index('inputs', drop=True)
+    net.matrices[nn.mkey(0, 'weights')] = dapd
+    return net
+
+#deprecated
+def build_stochastic_culled_net(inputs, labels, sizes=(784, 30, 10), percent_to_keep=0.1):
+    source_size = [sizes[0], int(sizes[1] / percent_to_keep), sizes[2]]
+    net = nn.NeuralNet(source_size)
+    # indexes to delete, not keep
+    best_indexes, neutral_indexes, worst_indexes = [], [], []
+
+    i = 1
+    original_size = source_size[i]
+    target_size = sizes[i]
+    # randomly pick neurons for neutral
+    neutral_index = np.arange(original_size)
+    np.random.shuffle(neutral_index)
+    neutral_indexes.append(neutral_index[target_size:])
+    # prepare apds
+    #TODO: running out of memory here
+    activations = net.pass_forward(inputs)
+    activations = activations[nn.mkey(i, 'post_activation')]
+    dapd_per_neuron = apd.cost(apd.apd_area(
+        apd.diff_by_label(activations, labels, num_buckets=30, chunk_size=250)), dim='labels')
+    # sort smallest to largest
+    dapd_indexes = dapd_per_neuron.argsort()
+    # pick biggest apd diff for best (remove all except end)
+    best_indexes.append(dapd_indexes[:-1 * target_size].values)
+    # pick smallest apd diff for worst (remove after beginning)
+    worst_indexes.append(dapd_indexes[target_size:].values)
+
+    best_indexes.append([])
+    neutral_indexes.append([])
+    worst_indexes.append([])
+
+    return net.delete_neurons(best_indexes), net.delete_neurons(neutral_indexes), net.delete_neurons(worst_indexes)
+
+def build_stochastic_culled_net_v2(inputs, labels, sizes=(784, 30, 10),
+    num_to_search=100, dapd_by_labels=None, dapd_scale_factor=2):
+    
+    best_weights = []
+    best_biases = []
+    control_weights = []
+    control_biases = []
+    worst_weights = []
+    worst_biases = []
+    # normalize dapd
+    best_dapd = apd.cost(dapd_by_labels, dim='labels').stack(
+        inputs=('inputs_y', 'inputs_x')).reset_index('inputs', drop=True)
+    best_dapd =  best_dapd / np.amax(best_dapd) * dapd_scale_factor
+    worst_dapd = dapd_scale_factor - best_dapd
+    for neuron in range(sizes[1]):
+        print('Generating neuron', neuron, '...')
+        control_net = nn.NeuralNet((sizes[0], num_to_search))
+        net = control_net
+        # control
+        control = np.random.randint(num_to_search)
+        control_weights.append(net.matrices[nn.mkey(0, 'weights')].isel(neurons=control))
+        control_biases.append(net.matrices[nn.mkey(0, 'biases')].isel(neurons=control))
+        # best
+        if not dapd_by_labels is None:
+            net = copy.deepcopy(control_net)
+            net.matrices[nn.mkey(0, 'weights')] = net.matrices[nn.mkey(0, 'weights')] * best_dapd
+        activations = net.pass_forward(inputs)[nn.mkey(1, 'post_activation')]
+        dapd_per_neuron = apd.cost(apd.apd_area(apd.diff_by_label(
+            activations, labels, num_buckets=30)), dim='labels')
+        best = np.argmax(dapd_per_neuron)
+        best_weights.append(net.matrices[nn.mkey(0, 'weights')].isel(neurons=best))
+        best_biases.append(net.matrices[nn.mkey(0, 'biases')].isel(neurons=best))
+        # worst
+        if not dapd_by_labels is None:
+            net = copy.deepcopy(control_net)
+            net.matrices[nn.mkey(0, 'weights')] = net.matrices[nn.mkey(0, 'weights')] * worst_dapd
+            activations = net.pass_forward(inputs)[nn.mkey(1, 'post_activation')]
+            dapd_per_neuron = apd.cost(apd.apd_area(apd.diff_by_label(
+                activations, labels, num_buckets=30)), dim='labels')
+        worst = np.argmin(dapd_per_neuron)
+        worst_weights.append(net.matrices[nn.mkey(0, 'weights')].isel(neurons=worst))
+        worst_biases.append(net.matrices[nn.mkey(0, 'biases')].isel(neurons=worst))
+    net = nn.NeuralNet(sizes)
+    best_net = copy.deepcopy(net)
+    best_net.matrices[nn.mkey(0, 'weights')] = xr.concat(best_weights, dim='neurons').transpose('inputs', 'neurons')
+    best_net.matrices[nn.mkey(0, 'biases')] = xr.concat(best_biases, dim='neurons')
+    control_net = copy.deepcopy(net)
+    control_net.matrices[nn.mkey(0, 'weights')] = xr.concat(control_weights, dim='neurons').transpose('inputs', 'neurons')
+    control_net.matrices[nn.mkey(0, 'biases')] = xr.concat(control_biases, dim='neurons')
+    worst_net = copy.deepcopy(net)
+    worst_net.matrices[nn.mkey(0, 'weights')] = xr.concat(worst_weights, dim='neurons').transpose('inputs', 'neurons')
+    worst_net.matrices[nn.mkey(0, 'biases')] = xr.concat(worst_biases, dim='neurons')
+    return best_net, control_net, worst_net
 
 def test_experiments():
     untrained_net = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/neuralnet-0-untrained.pyc')
@@ -80,5 +187,38 @@ def test_experiments():
 if __name__ == '__main__':
     images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
     labels = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
-    # inputs_activations(images, labels)
-    test_experiments()
+    
+    # dapd_by_labels = experiment_dapd_by_label(images, labels)
+    # utility.write_object(dapd_by_labels, '/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_0_noise.pyc')
+    # dapd_20_noise = experiment_dapd_by_label(utility.random_noise(images, percent_noise=0.2), labels)
+    # utility.write_object(dapd_20_noise, '/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_20_noise.pyc')
+    # dapd_50_noise = experiment_dapd_by_label(utility.random_noise(images, percent_noise=0.5), labels)
+    # utility.write_object(dapd_50_noise, '/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_50_noise.pyc')
+
+    dapd_by_labels = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_0_noise.pyc')
+    # dapd_20_noise = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_20_noise.pyc')
+    # dapd_50_noise = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_50_noise.pyc')
+    # utility.write_object(build_10x1_input_apd_net(dapd_by_labels), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x1_label_dapd.pyc')
+    # utility.write_object(build_10x10_input_apd_net(dapd_by_labels), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x10_label_dapd.pyc')
+    # utility.write_object(build_10x1_input_apd_net(dapd_50_noise), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x1_label_dapd_50_noise.pyc')
+    # utility.write_object(build_10x10_input_apd_net(dapd_50_noise), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x10_label_dapd_50_noise.pyc')
+    # utility.write_object(build_30x10_probability_apd_net(dapd_by_labels), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x10_label_dapd.pyc')
+    
+    experiment_dir = '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_reg_vs_culled_1/'
+    num_trials = 10
+    for i in range(num_trials):
+        best, control, worst = build_stochastic_culled_net_v2(images, labels, dapd_by_labels=dapd_by_labels, num_to_search=100)
+        utility.write_object(best, experiment_dir + 'untrained_30x10_semiculled100_best_' + str(i) + '.pyc')
+        utility.write_object(worst, experiment_dir + 'untrained_30x10_semiculled100_worst_' + str(i) + '.pyc')
+        best, control, worst = build_stochastic_culled_net_v2(images, labels, dapd_by_labels=dapd_by_labels, num_to_search=10)
+        utility.write_object(best, experiment_dir + 'untrained_30x10_semiculled10_best_' + str(i) + '.pyc')
+        utility.write_object(worst, experiment_dir + 'untrained_30x10_semiculled10_worst_' + str(i) + '.pyc')
+        best, control, worst = build_stochastic_culled_net_v2(images, labels, num_to_search=100)
+        utility.write_object(best, experiment_dir + 'untrained_30x10_rand_culled100_best_' + str(i) + '.pyc')
+        utility.write_object(worst, experiment_dir + 'untrained_30x10_rand_culled100_worst_' + str(i) + '.pyc')
+        best, control, worst = build_stochastic_culled_net_v2(images, labels, num_to_search=10)
+        utility.write_object(best, experiment_dir + 'untrained_30x10_rand_culled10_best_' + str(i) + '.pyc')
+        utility.write_object(worst, experiment_dir + 'untrained_30x10_rand_culled10_worst_' + str(i) + '.pyc')
+        utility.write_object(nn.NeuralNet((784, 30, 10)), experiment_dir + 'untrained_30x10_control_' + str(i) + '.pyc')
+
+    # test_experiments()

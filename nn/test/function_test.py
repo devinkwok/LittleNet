@@ -21,7 +21,7 @@ def test_2in_1out():
         xgrid, ygrid = np.meshgrid(x, y)
         input_grid = xr.DataArray(xr.concat([xr.DataArray(xgrid, dims=('input1', 'input2')), xr.DataArray(ygrid, dims=('input1', 'input2'))], dim='inputs'))
         input_grid = input_grid.assign_coords(input1=x, input2=y)
-        outputs = tensor.output_only(tensor.pass_forward(input_grid))
+        outputs = tensor.pass_forward_output_only(input_grid)
         outputs.plot()
     NUM_BATCHES = 100
     NUM_CASES = 100

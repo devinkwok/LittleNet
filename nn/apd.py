@@ -32,6 +32,16 @@ def apd_raw(activations, num_buckets=10):
     histogram = [np.maximum(1 - np.abs(b - scaled), 0) for b in range(num_buckets)]
     return xr.concat(histogram, dim='histogram_buckets').transpose(*activations.dims, 'histogram_buckets')
 
+#avoid out of memory by chunking operation
+#TODO: change into concat function
+def apd_in_chunks(activations, concat_dim='cases', chunk_size=1000, num_buckets=10):
+    groups = activations.groupby_bins(concat_dim, int(activations.sizes[concat_dim] / chunk_size))
+    apds = []
+    for a in groups:
+        apd = apd_raw(a[1], num_buckets=num_buckets)
+        apds.append(merge(apd, concat_dim))
+    return merge(xr.concat(apds, dim=concat_dim), concat_dim)
+
 def apd_area(apds):
     # first and last buckets are half sized, so subtract this from the sum total
     diff = apds.isel(histogram_buckets=0) * 0.5 + apds.isel(histogram_buckets=-1) * 0.5
@@ -68,8 +78,12 @@ def subset_by_label(raw_apd, labels, symbols, dims_to_exclude=['inputs']):
         raw_apd, cases=np.equal(labels, i)), *dims_to_exclude) for i in symbols]
     return xr.concat(label_apd, 'labels').transpose('labels', *label_apd[0].dims)
 
-def diff_by_label(activations, labels, symbols=range(10), dims_to_exclude=['inputs'], num_buckets=10):
-    raw_apd = apd_raw(activations, num_buckets=num_buckets)
+#TODO: remove chunk_size system (doesn't work)
+def diff_by_label(activations, labels, symbols=range(10), dims_to_exclude=['inputs'], num_buckets=10, chunk_size=None):
+    if chunk_size is None:
+        raw_apd = apd_raw(activations, num_buckets=num_buckets)
+    else:
+        raw_apd = apd_in_chunks(activations, chunk_size=chunk_size)
     total_apd = merge_ex(raw_apd, *dims_to_exclude)
     label_apd = subset_by_label(raw_apd, labels, symbols, dims_to_exclude)
     return diff(total_apd, label_apd).transpose('labels', *total_apd.dims)

@@ -21,7 +21,7 @@ EXPECTED_OUTPUT = 1./(1.+math.pow(math.e, -1*(LAYER_SIZES[1] * 1 / (1 + math.pow
 class NeuralNetTest(unittest.TestCase):
 
     def assert_nn_equal(self, net1, net2):
-        self.assertEqual(set(net1.matrices.keys()), set(net2.matrices.keys()))
+        self.assertSetEqual(set(net1.matrices.keys()), set(net2.matrices.keys()))
         for k in net1.matrices.keys():
             np.testing.assert_allclose(net1.matrices[k], net2.matrices[k])
 
@@ -150,12 +150,12 @@ class NeuralNetTest(unittest.TestCase):
         outputs = net.pass_forward(inputs)
         self.assert_dimensions(outputs, 'pre_activation', {'cases':[NUM_CASES]*len(LAYER_SIZES), 'inputs':LAYER_SIZES})
         self.assert_dimensions(outputs, 'post_activation', {'cases':[NUM_CASES]*len(LAYER_SIZES), 'inputs':LAYER_SIZES})
-        np.testing.assert_allclose(net.output_only(outputs).isel(inputs=0), EXPECTED_OUTPUT)
+        np.testing.assert_allclose(net.pass_forward_output_only(inputs).isel(inputs=0), EXPECTED_OUTPUT)
 
-    def test_output_only(self):
+    def test_pass_forward_output_only(self):
         net = NeuralNet(LAYER_SIZES, func_fill=np.ones)
         inputs = xr.DataArray(np.zeros((NUM_CASES, INPUT_SIZE)), dims=('cases', 'inputs'))
-        output = net.output_only(net.pass_forward(inputs))
+        output = net.pass_forward_output_only(inputs)
         self.assertDictEqual(dict(output.sizes), {'cases': NUM_CASES, 'inputs': NUM_LABELS})
     
     def test_pass_back(self):
@@ -207,7 +207,7 @@ class NeuralNetTest(unittest.TestCase):
         net = NeuralNet(LAYER_SIZES, func_fill=np.ones)
         inputs = xr.DataArray(np.zeros((NUM_CASES, INPUT_SIZE)), dims=['cases', 'inputs'])
         activations = net.pass_forward(inputs)
-        new_net = net.delete_neurons(activations, [[3, 1], [0]])
+        new_net = net.delete_neurons([[3, 1], [0]], activations=activations)
         sizes = [x for x in LAYER_SIZES]
         sizes[1] -= 2
         sizes[2] -= 1
