@@ -42,7 +42,7 @@ class TrainTest(unittest.TestCase):
     def test_benchmark(self):
         images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
         labels_onehot = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
-        labels_onehot = neural_net.make_onehot(labels_onehot, np.arange(10))
+        labels_onehot = utility.make_onehot(labels_onehot, np.arange(10))
         net = neural_net.NeuralNet((784, 30, 10))
         inputs = images.isel(cases=slice(1000))
         labels = labels_onehot.isel(cases=slice(1000))

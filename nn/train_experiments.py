@@ -83,13 +83,13 @@ def plot_all_nets(directory, key='untrained_'):
     for name, net in utility.read_all_objects(directory, key + '*'):
         name = name.split(key)[-1].split('.pyc')[0]
         print(name)
-        utility.plot_layer_weights(net)
+        utility.plot_layer_weights(net, layer=0, shape=(28, 28))
     plt.show()
 
 if __name__ == '__main__':
     images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
     labels_onehot = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
-    labels_onehot = nn.make_onehot(labels_onehot, np.arange(10))
+    labels_onehot = utility.make_onehot(labels_onehot, np.arange(10))
     num_input_cases = 50000
     num_tests = 1000
     inputs = images.isel(cases=slice(num_input_cases))
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     # test_dir = '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/'
     # experiment_randomized_data_random_vs_kernel(inputs, labels, test_inputs, test_labels)
 
-    # plot_all_nets(test_dir, key='untrained_')
+    plot_all_nets(test_dir, key='untrained_30x10_control')
     # experiment_all_nets(test_dir)
     # plot_all_nets(test_dir, key='trained-')
 

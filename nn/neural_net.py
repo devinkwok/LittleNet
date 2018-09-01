@@ -4,17 +4,29 @@ import numpy as np
 import xarray as xr
 
 
+DIM_LABEL = 'labels'
+"""Dimension key for onehot vector dimension, used in xarray"""
+
+DIM_CASE = 'cases'
+"""Dimension key along which inputs in the same batch are ordered, used in xarray"""
+
+DIM_IN_X = 'inputs_x'
+"""Dimension key for 2-D inputs in horizontal axis, used in xarray"""
+
+DIM_IN_Y = 'inputs_y'
+"""Dimension key for 2-D inputs in vertical axis, used in xarray"""
+
+DIM_IN = 'inputs'
+"""Dimension key for input dimension, used in xarray"""
+
+DIM_OUT = 'neurons'
+"""Dimension key for output dimension, used in xarray"""
+
 KEY_WEIGHT = 'weights'
 """Dictionary key for weight arrays, used as argument_name in mkey()"""
 
 KEY_BIAS = 'biases'
 """Dictionary key for bias arrays, used as argument_name in mkey()"""
-
-KEY_INPUT = 'inputs'
-"""Dictionary key for input dimension, used as argument_name in mkey()"""
-
-KEY_OUTPUT = 'neurons'
-"""Dictionary key for output dimension, used as argument_name in mkey()"""
 
 KEY_OUT_PRE = 'pre_activation'
 """Dictionary key for output values without applying activation function,
@@ -22,14 +34,7 @@ used as argument_name in mkey()"""
 
 KEY_OUT_POST = 'post_activation'
 """Dictionary key for output values after activation function is applied,
-used as argument_name in mkey()"""
-
-KEY_LABEL = 'labels'
-"""Dictionary key for onehot vector dimension, used as argument_name in mkey()"""
-
-KEY_CASE = 'cases'
-"""Dictionary key for dimension along with inputs in the same batch are ordered,
-used as argument_name in mkey()"""
+used as argument_name in mkey() """
 
 
 def mkey(layer, argument_name):
@@ -92,24 +97,6 @@ def dict_subset(dictionary, *keywords):
     return subset
 
 
-def make_onehot(label_xarray, symbols_list):
-    """Makes onehot vector: a vector with a single 1 per row, one column per uniquesymbol
-
-    Arguments:
-        label_xarray {[type]} -- [description]
-        symbols_list {[type]} -- [description]
-
-    Returns:
-        [type] -- [description]
-    """
-
-    onehot_array = []
-    for symbol in symbols_list:
-        onehot_array.append(np.equal(label_xarray, symbol))
-    labels = xr.concat(onehot_array, dim=KEY_LABEL).astype(float)
-    return labels.transpose(*label_xarray.dims, KEY_LABEL)
-
-
 def sigmoid(np_array):
     """Applies sigmoid function to array
 
@@ -141,10 +128,10 @@ def accuracy(test_onehot, goal_onehot, threshold=0.5):
     """Compares if onehot vectors are equal to a threshold
 
     Arguments:
-        test_onehot {xarray[dims: KEY_INPUT]} -- first onehot vector,
-            onehots encoded on dim=KEY_INPUT
-        goal_onehot {xarray[dims: KEY_LABEL]} -- second onehot vector,
-            onehots encoded on dim=KEY_LABEl
+        test_onehot {xarray[dims: DIM_IN]} -- first onehot vector,
+            onehots encoded on dim=DIM_IN
+        goal_onehot {xarray[dims: DIM_LABEL]} -- second onehot vector,
+            onehots encoded on dim=DIM_LABEL
 
     Keyword Arguments:
         threshold {float} -- pivot point at which onehot value is considered 0 or 1:
@@ -154,10 +141,10 @@ def accuracy(test_onehot, goal_onehot, threshold=0.5):
         xarray(bool) -- Array of booleans, one per onehot
     """
 
-    by_threshold = np.logical_and(np.less(test_onehot.max(dim=KEY_INPUT), threshold),
-                                  np.less_equal(goal_onehot.max(dim=KEY_LABEL), 0))
+    by_threshold = np.logical_and(np.less(test_onehot.max(dim=DIM_IN), threshold),
+                                  np.less_equal(goal_onehot.max(dim=DIM_LABEL), 0))
     by_max_value = test_onehot.argmax(
-        dim=KEY_INPUT) == goal_onehot.argmax(dim=KEY_LABEL)
+        dim=DIM_IN) == goal_onehot.argmax(dim=DIM_LABEL)
     return np.logical_or(by_threshold, by_max_value)
 
 
@@ -165,10 +152,10 @@ def accuracy_sum(test_onehot, goal_onehot, threshold=0.5, sum_along_dim=None):
     """Same as accuracy(), but returns number of equal vectors
 
     Arguments:
-        test_onehot {xarray[dims: KEY_INPUT]} -- first onehot vector,
-            onehots encoded on dim=KEY_INPUT
-        goal_onehot {xarray[dims: KEY_LABEL]} -- second onehot vector,
-            onehots encoded on dim=KEY_LABEl
+        test_onehot {xarray[dims: DIM_IN]} -- first onehot vector,
+            onehots encoded on dim=DIM_IN
+        goal_onehot {xarray[dims: DIM_LABEL]} -- second onehot vector,
+            onehots encoded on dim=DIM_LABEL
 
     Keyword Arguments:
         threshold {float} -- pivot point at which onehot value is considered 0 or 1:
@@ -200,7 +187,7 @@ def cost_mean_squared(test_onehot, goal_onehot, sum_along_dim=None):
     """
 
     return np.square(np.subtract(
-        test_onehot, goal_onehot.rename({KEY_LABEL: KEY_INPUT}))) \
+        test_onehot, goal_onehot.rename({DIM_LABEL: DIM_IN}))) \
         .mean(dim=sum_along_dim)
 
 
@@ -246,24 +233,24 @@ class NeuralNet(object):
         for i, l_size, next_l in zip(range(self.num_layers),
                                      layer_sizes[:-1], layer_sizes[1:]):
             self.matrices[mkey(i, KEY_WEIGHT)] = xr.DataArray(
-                func_fill((l_size, next_l)), dims=(KEY_INPUT, KEY_OUTPUT))
+                func_fill((l_size, next_l)), dims=(DIM_IN, DIM_OUT))
             self.matrices[mkey(i, KEY_BIAS)] = xr.DataArray(
-                func_fill((next_l,)), dims=(KEY_OUTPUT))
+                func_fill((next_l,)), dims=(DIM_OUT))
 
     def pass_forward(self, inputs, func_normalize=lambda x: x):
         """Applies NeuralNet to inputs
 
         Arguments:
-            inputs {xarray[dims: KEY_INPUT]} -- xarray with dimension
-                KEY_INPUT, same size as KEY_INPUT in self.matrices[mkey(0, KEY_WEIGHT)]
+            inputs {xarray[dims: DIM_IN]} -- xarray with dimension
+                DIM_IN, same size as DIM_IN in self.matrices[mkey(0, KEY_WEIGHT)]
 
         Keyword Arguments:
             func_normalize {function(np_array): np_array} -- function to
                 apply to inputs before passing through neural network (default: {lambdax:x})
 
         Raises:
-            ValueError -- Missing dimension KEY_INPUT in inputs
-            ValueError -- Size of inputs dimension KEY_INPUT does not match layer 0 size
+            ValueError -- Missing dimension DIM_IN in inputs
+            ValueError -- Size of inputs dimension DIM_IN does not match layer 0 size
 
         Returns:
             dict(xarray[dims: KEY_OUT_PRE or KEY_OUT_POST]) -- Dictionary containing
@@ -272,36 +259,36 @@ class NeuralNet(object):
                 and KEY_OUT_POST (with activation function applied)
         """
 
-        if not KEY_INPUT in inputs.dims:
+        if not DIM_IN in inputs.dims:
             raise ValueError('Missing dimension \'' +
-                             KEY_INPUT + '\' in inputs')
-        tsize = inputs.sizes[KEY_INPUT]
-        msize = self.matrices[mkey(0, KEY_WEIGHT)].sizes[KEY_INPUT]
+                             DIM_IN + '\' in inputs')
+        tsize = inputs.sizes[DIM_IN]
+        msize = self.matrices[mkey(0, KEY_WEIGHT)].sizes[DIM_IN]
         if tsize != msize:
-            raise ValueError('Size of \'' + KEY_INPUT + '\'=' + str(tsize) +
+            raise ValueError('Size of \'' + DIM_IN + '\'=' + str(tsize) +
                              ' does not match layer 0 size: ' + str(msize))
 
         # ugly hack: remove coordinates for dimension 'inputs' if coordinates present
-        if KEY_INPUT in inputs.coords:
-            inputs = inputs.reset_index(KEY_INPUT, drop=True)
+        if DIM_IN in inputs.coords:
+            inputs = inputs.reset_index(DIM_IN, drop=True)
         activations = {mkey(0, KEY_OUT_PRE): inputs,
                        mkey(0, KEY_OUT_POST): func_normalize(inputs)}
         for i in range(self.num_layers):
             pre_activation = np.add(xr.dot(activations[mkey(i, KEY_OUT_POST)],
                                            self.matrices[mkey(i, KEY_WEIGHT)],
-                                           dims=(KEY_INPUT)), self.matrices[mkey(i, KEY_BIAS)])
+                                           dims=(DIM_IN)), self.matrices[mkey(i, KEY_BIAS)])
             activations[mkey(i+1, KEY_OUT_PRE)
-                       ] = pre_activation.rename({KEY_OUTPUT: KEY_INPUT})
+                       ] = pre_activation.rename({DIM_OUT: DIM_IN})
             activations[mkey(i + 1, KEY_OUT_POST)] = self.func_activation(
-                pre_activation).rename({KEY_OUTPUT: KEY_INPUT})
+                pre_activation).rename({DIM_OUT: DIM_IN})
         return activations
 
     def pass_forward_output_only(self, inputs, func_normalize=lambda x: x):
         """Same as self.pass_forward() but only returns the output layer's activations
 
         Arguments:
-            inputs {xarray[dims: KEY_INPUT]} -- xarray with dimension
-                KEY_INPUT, same size as KEY_INPUT in self.matrices[mkey(0, KEY_WEIGHT)]
+            inputs {xarray[dims: DIM_IN]} -- xarray with dimension
+                DIM_IN, same size as DIM_IN in self.matrices[mkey(0, KEY_WEIGHT)]
 
         Keyword Arguments:
             func_normalize {function(np_array): np_array} -- function to
@@ -321,43 +308,43 @@ class NeuralNet(object):
         Arguments:
             activations {dict(xarray[dims: KEY_OUT_PRE or KEY_OUT_POST])} -- dict which is
                 the return value of self.pass_forward()
-            goal_label {xarray[dims: KEY_LABEL]} -- array of onehot vectors encoded
-                along dim=KEY_LABEL
+            goal_label {xarray[dims: DIM_LABEL]} -- array of onehot vectors encoded
+                along dim=DIM_LABEL
 
         Keyword Arguments:
             func_loss_d {function(xarray, xarray)} -- derivative of loss function,
-                returns gradients of dim=KEY_OUTPUT same size as final layer outputs
+                returns gradients of dim=DIM_OUT same size as final layer outputs
                 (default: {lambda output_v, goal_v: np.subtract(goal_v, output_v)})
 
         Returns:
-            dict(xarray[dims: KEY_INPUT, KEY_OUTPUT]) -- dict of gradients, containing
+            dict(xarray[dims: DIM_IN, DIM_OUT]) -- dict of gradients, containing
                 xarrays in same format as self.matrices
         """
 
         gradients = {}
         partial_d = func_loss_d(activations[mkey(self.num_layers, KEY_OUT_POST)],
-                                goal_label.rename({KEY_LABEL: KEY_INPUT}))
+                                goal_label.rename({DIM_LABEL: DIM_IN}))
         for i in reversed(range(self.num_layers)):
             partial_d = np.multiply(partial_d, self.func_activation_d(
-                activations[mkey(i+1, KEY_OUT_PRE)])).rename({KEY_INPUT: KEY_OUTPUT})
+                activations[mkey(i+1, KEY_OUT_PRE)])).rename({DIM_IN: DIM_OUT})
             # times 1, the bias's derivative
             gradients[mkey(i, KEY_BIAS)] = partial_d
             gradients[mkey(i, KEY_WEIGHT)] = np.multiply(
                 partial_d, activations[mkey(i, KEY_OUT_POST)])  # times input
             partial_d = xr.dot(
-                partial_d, self.matrices[mkey(i, KEY_WEIGHT)], dims=(KEY_OUTPUT))
+                partial_d, self.matrices[mkey(i, KEY_WEIGHT)], dims=(DIM_OUT))
         return gradients
 
     def train_yield(self, batch_inputs, batch_labels, training_rate=1.0, deep_copy=True):
         """Trains NeuralNet on a batch of inputs, iterating through each batch
 
         Arguments:
-            batch_inputs {iter(xarray[dims: KEY_CASE, KEY_INPUT])} -- multiple inputs
+            batch_inputs {iter(xarray[dims: DIM_CASE, DIM_IN])} -- multiple inputs
                 of same format as inputs to self.pass_forward(), grouped together along dim
-                KEY_CASE, use xarray.groupby() to generate
-            batch_labels {iter(xarray[dims: KEY_CASE, KEY_LABEL])} -- multiple labels
+                DIM_CASE, use xarray.groupby() to generate
+            batch_labels {iter(xarray[dims: DIM_CASE, DIM_LABEL])} -- multiple labels
                 of same format as labels to self.pass_back(), grouped together along along dim
-                KEY_CASE, use xarray.groupby() to generate
+                DIM_CASE, use xarray.groupby() to generate
 
         Keyword Arguments:
             training_rate {float} -- training rate by which gradients are multiplied
@@ -379,19 +366,19 @@ class NeuralNet(object):
             gradients = new_net.pass_back(new_net.pass_forward(inputs), labels)
             for key in gradients.keys():
                 new_net.matrices[key] = np.add(new_net.matrices[key], np.multiply(
-                    gradients[key].mean(dim=KEY_CASE), training_rate))
+                    gradients[key].mean(dim=DIM_CASE), training_rate))
             yield new_net, inputs, labels
 
     def train(self, batch_inputs, batch_labels, training_rate=1.0, deep_copy=True):
         """Same as self.train_yield(), but returns only the final result
 
         Arguments:
-            batch_inputs {iter(xarray[dims: KEY_CASE, KEY_INPUT])} -- multiple inputs
+            batch_inputs {iter(xarray[dims: DIM_CASE, DIM_IN])} -- multiple inputs
                 of same format as inputs to self.pass_forward(), grouped together along dim
-                KEY_CASE, use xarray.groupby() to generate
-            batch_labels {iter(xarray[dims: KEY_CASE, KEY_LABEL])} -- multiple labels
+                DIM_CASE, use xarray.groupby() to generate
+            batch_labels {iter(xarray[dims: DIM_CASE, DIM_LABEL])} -- multiple labels
                 of same format as labels to self.pass_back(), grouped together along along dim
-                KEY_CASE, use xarray.groupby() to generate
+                DIM_CASE, use xarray.groupby() to generate
 
         Keyword Arguments:
             training_rate {float} -- training rate by which gradients are multiplied
@@ -433,20 +420,20 @@ class NeuralNet(object):
             if not neurons:
                 continue
             new_net.matrices[mkey(i, KEY_WEIGHT)] = del_rows(
-                new_net.matrices[mkey(i, KEY_WEIGHT)], KEY_OUTPUT, neurons)
+                new_net.matrices[mkey(i, KEY_WEIGHT)], DIM_OUT, neurons)
             new_net.matrices[mkey(i, KEY_BIAS)] = del_rows(
-                new_net.matrices[mkey(i, KEY_BIAS)], KEY_OUTPUT, neurons)
+                new_net.matrices[mkey(i, KEY_BIAS)], DIM_OUT, neurons)
             if i + 1 < self.num_layers:
                 if not activations is None:
                     for neuron in neurons:
                         bias = activations[mkey(i + 1, KEY_OUT_POST)].isel(
-                            inputs=neuron).mean(dim=KEY_CASE)
+                            {DIM_IN: neuron}).mean(dim=DIM_CASE)
                         bias_adjust = np.multiply(
-                            bias, new_net.matrices[mkey(i + 1, KEY_WEIGHT)].isel(inputs=neuron))
+                            bias, new_net.matrices[mkey(i + 1, KEY_WEIGHT)].isel({DIM_IN: neuron}))
                         new_net.matrices[mkey(i + 1, KEY_BIAS)] = np.add(
                             new_net.matrices[mkey(i + 1, KEY_BIAS)], bias_adjust)
                 new_net.matrices[mkey(i + 1, KEY_WEIGHT)] = del_rows(
-                    new_net.matrices[mkey(i + 1, KEY_WEIGHT)], KEY_INPUT, neurons)
+                    new_net.matrices[mkey(i + 1, KEY_WEIGHT)], DIM_IN, neurons)
         return new_net
 
     def __repr__(self):

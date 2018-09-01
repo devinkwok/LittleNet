@@ -1,10 +1,7 @@
 import itertools
 import numpy as np
 import xarray as xr
-import pandas as pd
-import matplotlib.pyplot as plt
 import neural_net as nn
-from neural_net import mkey
 import utility
 
 def shuffle_indexes(*xr_arrays, shuffle_dim='cases'):
@@ -23,12 +20,12 @@ def combine_arrays(*xr_arrays, combine_dim='cases'):
 
 def empty_labels(inputs, dim='cases', symbols=10):
     labels = xr.DataArray(np.full((inputs.sizes[dim]), None), dims=(dim))
-    return nn.make_onehot(labels, np.arange(symbols))
+    return utility.make_onehot(labels, np.arange(symbols))
 
 # makes enough shuffled copies of arrays to have tile_size items in tile_dim
 def tile_shuffled_cases(*xr_arrays, tile_size=0, tile_dim='cases'):
     output_arrays = [[] for x in xr_arrays]
-    for i in range(0, tile_size + xr_arrays[0].sizes[tile_dim],  xr_arrays[0].sizes[tile_dim]):
+    for _ in range(0, tile_size + xr_arrays[0].sizes[tile_dim],  xr_arrays[0].sizes[tile_dim]):
         shuffled_arrays = shuffle_indexes(*xr_arrays)
         [x.append(y) for x, y in zip(output_arrays, shuffled_arrays)]
     combined_arrays = [combine_arrays(*x) for x in output_arrays]
@@ -93,7 +90,7 @@ def benchmark(*name_net_input_label_tuples, test_inputs=None, test_labels=None,
             train_inputs, train_labels = tile_shuffled_cases(net_inputs.isel(cases=slice(case)),
                 net_labels.isel(cases=slice(case)), tile_size=max_batches * max(batch_sizes))
 
-            for batch, rate in utility.vectorize_params(batch_sizes, rates):
+            for batch, rate in utility.compose_params(batch_sizes, rates):
                 id_dict = {'name': name, 'cases': case, 'batch_size': batch, 'training_rate': rate}
                 name_id = name + '-' + str(int(case)) + 'cases-' + str(int(batch)) + \
                     'batchsize-' + str(rate) + 'rate'

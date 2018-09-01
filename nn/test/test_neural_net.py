@@ -4,6 +4,7 @@ import random, string
 import xarray as xr
 import math
 from nn.neural_net import *
+import utility
 
 LAYER_SIZES = [10, 5, 2]
 NUM_LAYERS = len(LAYER_SIZES)-1
@@ -68,27 +69,6 @@ class NeuralNetTest(unittest.TestCase):
             self.assertTrue(mkey(i, 'weights') in layers)
             self.assertTrue(mkey(i, 'biases') in layers)
         self.assertTrue(mkey(0, 'weights') in subset)
-    
-    def test_make_onehot(self):
-        int_labels = xr.DataArray(np.array([[0, 0], [1, 2]]), dims=('batches', 'cases'))
-        int_symbols = [0, 1]
-        int_onehot = make_onehot(int_labels, int_symbols)
-        int_expected = np.array([[[1, 0], [1, 0]], [[0, 1], [0, 0]]])
-        self.assertDictEqual(dict(int_onehot.sizes), {'batches': int_labels.sizes['batches'],
-            'cases': int_labels.sizes['cases'], 'labels': len(int_symbols)})
-        for i, j in zip(int_onehot, int_expected):
-            np.testing.assert_array_equal(i, j)
-        #TODO: allow/disallow string labels, or maybe use coordinates instead
-        # str_labels = xr.DataArray(np.array([['a', 'a'], ['bb', 'c']]), dims=('batches', 'cases'))
-        # str_symbols = ['a', 'bb']
-        # str_onehot = make_onehot(str_labels, str_symbols)
-        # str_expected = np.array([[[1, 0],
-        #     [1, 0]],
-        #     [[0, 1],
-        #     [0, 0]]])
-        # self.assertDictEqual(dict(str_onehot.sizes), {'cases': len(str_labels), 'labels': len(str_symbols)})
-        # for i, j in zip(str_onehot, str_expected):
-        #     np.testing.assert_array_equal(i, j)
     
     def test_sigmoid(self):
         output = sigmoid(SIGMOID_INPUT)
@@ -163,7 +143,7 @@ class NeuralNetTest(unittest.TestCase):
             activations[mkey(i, 'post_activation')] = xr.DataArray(np.ones((NUM_CASES, l_size)), dims=('cases', 'inputs'))
         inputs = xr.DataArray(np.ones((NUM_CASES, INPUT_SIZE)), dims=('cases', 'inputs'))
         activations = net.pass_forward(inputs)
-        labels = make_onehot(xr.DataArray(np.arange(NUM_CASES), dims=('cases')), np.arange(NUM_LABELS))  # labels are 0 to n
+        labels = utility.make_onehot(xr.DataArray(np.arange(NUM_CASES), dims=('cases')), np.arange(NUM_LABELS))  # labels are 0 to n
         gradients = net.pass_back(activations, labels)
         self.assert_dimensions(gradients, 'weights', {'cases':[NUM_CASES]*NUM_LAYERS, 'inputs':LAYER_SIZES[:-1], 'neurons':LAYER_SIZES[1:]})
         self.assert_dimensions(gradients, 'biases', {'cases': [NUM_CASES] * NUM_LAYERS, 'neurons': LAYER_SIZES[1:]})
@@ -187,7 +167,7 @@ class NeuralNetTest(unittest.TestCase):
         self.assert_nn_equal(net, net2)
         NUM_BATCHES = 4
         inputs = xr.DataArray(np.zeros((NUM_BATCHES * NUM_CASES, INPUT_SIZE)), dims=['cases', 'inputs'])
-        labels = make_onehot(xr.DataArray(np.zeros((NUM_BATCHES * NUM_CASES,)), dims=['cases']), np.zeros(NUM_LABELS))
+        labels = utility.make_onehot(xr.DataArray(np.zeros((NUM_BATCHES * NUM_CASES,)), dims=['cases']), np.zeros(NUM_LABELS))
         inputs = inputs.groupby_bins('cases', NUM_BATCHES)
         labels = labels.groupby_bins('cases', NUM_BATCHES)
         trained = net.train(list(inputs), list(labels))

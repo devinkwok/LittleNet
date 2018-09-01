@@ -176,7 +176,7 @@ def test_experiments():
     kernel_net = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/neuralnet-trained-from-artificial-kernel.pyc')
     images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
     labels = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
-    labels_onehot = nn.make_onehot(labels, np.arange(10))
+    labels_onehot = utility.make_onehot(labels, np.arange(10))
     #TODO: remove dead neurons, prune correlated neuron pairs
     # utility.plot_layer_weights(untrained_net)
     # utility.plot_layer_weights(trained_net)

@@ -95,7 +95,7 @@ def test_compare():
 def test_mnist():
     images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
     labels = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
-    labels = nn.make_onehot(labels, np.arange(10))
+    labels = utility.make_onehot(labels, np.arange(10))
     return train.train_regular(nn.NeuralNet((784, 30, 10)), images, labels)
 
 if __name__ == '__main__':

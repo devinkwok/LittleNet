@@ -118,18 +118,18 @@ def test():
     NUM_CASES = 5
     NUM_INPUTS = 10
     NUM_OUTPUTS = 2
-    KEY_INPUTS = 'inputs'
-    KEY_OUTPUTS = 'neurons'
-    KEY_LABELS = 'labels'
-    KEY_CASES = 'cases'
+    DIM_IN = 'inputs'
+    DIM_OUT = 'neurons'
+    DIM_LABEL = 'labels'
+    DIM_CASE = 'cases'
 
-    layer0 = InputLayer({KEY_INPUTS: NUM_INPUTS})
-    layer1 = FullyConnectedLayer(layer0, {KEY_OUTPUTS: NUM_OUTPUTS})
+    layer0 = InputLayer({DIM_IN: NUM_INPUTS})
+    layer1 = FullyConnectedLayer(layer0, {DIM_OUT: NUM_OUTPUTS})
     layer2 = OutputLayer(layer1)
 
-    input_coords = {KEY_CASES: np.arange(NUM_CASES), KEY_INPUTS: np.arange(NUM_INPUTS)}
+    input_coords = {DIM_CASE: np.arange(NUM_CASES), DIM_IN: np.arange(NUM_INPUTS)}
     inputs = xr.DataArray(np.ones((NUM_CASES,NUM_INPUTS)), dims=[*input_coords], coords=input_coords)
-    label_coords = {KEY_CASES: np.arange(NUM_CASES), KEY_LABELS: np.arange(NUM_OUTPUTS)}
+    label_coords = {DIM_CASE: np.arange(NUM_CASES), KEY_LABELS: np.arange(NUM_OUTPUTS)}
     labels = xr.DataArray(np.ones((NUM_CASES, NUM_OUTPUTS)), dims=[*label_coords], coords=label_coords)
 
     #TODO
