@@ -1,12 +1,9 @@
+import unittest
 import numpy as np
 import random, string
 import xarray as xr
-import unittest
 import math
-
-from nn.neural_net import mkey, sigmoid, sigmoid_d, dict_subset, del_rows, \
-    make_onehot, accuracy, accuracy_sum, cost_mean_squared, NeuralNet
-
+from nn.neural_net import *
 
 LAYER_SIZES = [10, 5, 2]
 NUM_LAYERS = len(LAYER_SIZES)-1
@@ -103,12 +100,6 @@ class NeuralNetTest(unittest.TestCase):
         for i, j in zip(output, SIGMOID_D_OUTPUT):
             self.assertAlmostEqual(i, j)
 
-    def test_accuracy_sum(self):
-        test_onehot = xr.DataArray([[0, 0.5], [0.5, 0]], dims=('cases', 'inputs'))
-        goal_onehot = xr.DataArray([[0, 1], [0, 1]], dims=('cases', 'labels'))
-        actual = accuracy_sum(test_onehot, goal_onehot)
-        np.testing.assert_array_equal(accuracy_sum(test_onehot, goal_onehot), 1)
-
     def test_accuracy(self):
         test_onehot = xr.DataArray([[0, 0.6], [0.6, 0], [0.4, 0], [0, 0.4]], dims=('cases', 'inputs'))
         goal_onehot = xr.DataArray([[0, 1], [0, 1], [0, 1], [0, 0]], dims=('cases', 'labels'))
@@ -116,6 +107,12 @@ class NeuralNetTest(unittest.TestCase):
         actual = accuracy(test_onehot, goal_onehot)
         np.testing.assert_array_equal(expected, actual)
         self.assertEqual(actual.sum(), expected.sum())
+
+    def test_accuracy_sum(self):
+        test_onehot = xr.DataArray([[0, 0.5], [0.5, 0]], dims=('cases', 'inputs'))
+        goal_onehot = xr.DataArray([[0, 1], [0, 1]], dims=('cases', 'labels'))
+        actual = accuracy_sum(test_onehot, goal_onehot)
+        np.testing.assert_array_equal(accuracy_sum(test_onehot, goal_onehot), 1)
 
     def test_cost_mean_squared(self):
         test_onehot = xr.DataArray(np.arange(10), dims='inputs')

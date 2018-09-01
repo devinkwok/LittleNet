@@ -122,10 +122,12 @@ def build_stochastic_culled_net_v2(inputs, labels, sizes=(784, 30, 10),
     worst_weights = []
     worst_biases = []
     # normalize dapd
-    best_dapd = apd.cost(dapd_by_labels, dim='labels').stack(
-        inputs=('inputs_y', 'inputs_x')).reset_index('inputs', drop=True)
-    best_dapd =  best_dapd / np.amax(best_dapd) * dapd_scale_factor
-    worst_dapd = dapd_scale_factor - best_dapd
+    best_dapd, worst_dapd = None, None
+    if not dapd_by_labels is None:
+        best_dapd = apd.cost(dapd_by_labels, dim='labels').stack(
+            inputs=('inputs_y', 'inputs_x')).reset_index('inputs', drop=True)
+        best_dapd =  best_dapd / np.amax(best_dapd) * dapd_scale_factor
+        worst_dapd = dapd_scale_factor - best_dapd
     for neuron in range(sizes[1]):
         print('Generating neuron', neuron, '...')
         control_net = nn.NeuralNet((sizes[0], num_to_search))
@@ -205,20 +207,21 @@ if __name__ == '__main__':
     # utility.write_object(build_30x10_probability_apd_net(dapd_by_labels), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x10_label_dapd.pyc')
     
     experiment_dir = '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_reg_vs_culled_1/'
-    num_trials = 10
-    for i in range(num_trials):
+    num_trials = 5
+    for i in range(1, num_trials):
+        if i > 1:
+            utility.write_object(nn.NeuralNet((784, 30, 10)), experiment_dir + 'untrained_30x10_control_' + str(i) + '.pyc')
+            best, control, worst = build_stochastic_culled_net_v2(images, labels, num_to_search=100)
+            utility.write_object(best, experiment_dir + 'untrained_30x10_rand_culled100_best_' + str(i) + '.pyc')
+            utility.write_object(worst, experiment_dir + 'untrained_30x10_rand_culled100_worst_' + str(i) + '.pyc')
+            best, control, worst = build_stochastic_culled_net_v2(images, labels, num_to_search=10)
+            utility.write_object(best, experiment_dir + 'untrained_30x10_rand_culled10_best_' + str(i) + '.pyc')
+            utility.write_object(worst, experiment_dir + 'untrained_30x10_rand_culled10_worst_' + str(i) + '.pyc')
         best, control, worst = build_stochastic_culled_net_v2(images, labels, dapd_by_labels=dapd_by_labels, num_to_search=100)
         utility.write_object(best, experiment_dir + 'untrained_30x10_semiculled100_best_' + str(i) + '.pyc')
         utility.write_object(worst, experiment_dir + 'untrained_30x10_semiculled100_worst_' + str(i) + '.pyc')
         best, control, worst = build_stochastic_culled_net_v2(images, labels, dapd_by_labels=dapd_by_labels, num_to_search=10)
         utility.write_object(best, experiment_dir + 'untrained_30x10_semiculled10_best_' + str(i) + '.pyc')
         utility.write_object(worst, experiment_dir + 'untrained_30x10_semiculled10_worst_' + str(i) + '.pyc')
-        best, control, worst = build_stochastic_culled_net_v2(images, labels, num_to_search=100)
-        utility.write_object(best, experiment_dir + 'untrained_30x10_rand_culled100_best_' + str(i) + '.pyc')
-        utility.write_object(worst, experiment_dir + 'untrained_30x10_rand_culled100_worst_' + str(i) + '.pyc')
-        best, control, worst = build_stochastic_culled_net_v2(images, labels, num_to_search=10)
-        utility.write_object(best, experiment_dir + 'untrained_30x10_rand_culled10_best_' + str(i) + '.pyc')
-        utility.write_object(worst, experiment_dir + 'untrained_30x10_rand_culled10_worst_' + str(i) + '.pyc')
-        utility.write_object(nn.NeuralNet((784, 30, 10)), experiment_dir + 'untrained_30x10_control_' + str(i) + '.pyc')
 
     # test_experiments()

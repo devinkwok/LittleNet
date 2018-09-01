@@ -8,8 +8,8 @@ import utility
 from train import write_nn, train_nn, train_with_noise, train_with_random, \
     train_with_shuffled, train_with_shuffled_random_noise, build_kernel_net
 
-PLOT_COLORS = ['tab:blue', 'tab:gray', 'tab:red', 'tab:orange', 'tab:green',
-    'tab:purple', 'tab:brown', 'tab:pink', 'tab:olive', 'tab:cyan']
+PLOT_COLORS = ['tab:blue', 'tab:cyan', 'tab:gray', 'tab:orange', 'tab:red', 'tab:green',
+    'tab:purple', 'tab:brown', 'tab:pink', 'tab:olive']
 PLOT_LINESTYLES = ["-","--","-.",":"]
 
 def plot_loss_arrays(*filename_filters, directory='/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment/', filename_prefix='progress-'):
@@ -102,8 +102,18 @@ if __name__ == '__main__':
     # experiment_randomized_data_random_vs_kernel(inputs, labels, test_inputs, test_labels)
 
     # plot_all_nets(test_dir, key='untrained_')
-    experiment_all_nets(test_dir)
+    # experiment_all_nets(test_dir)
     # plot_all_nets(test_dir, key='trained-')
 
-    groups = ['*regular', '*noise', '*random', '*shuffled', '*combo']
+    groups = [
+        '*semiculled100_best*random',
+        # '*rand_culled100_best*random',
+        '*semiculled10_best*random',
+        # '*rand_culled10_best*random',
+        '*control*regular',
+        '*semiculled10_worst*random',
+        # '*rand_culled10_worst*random',
+        '*semiculled100_worst*random'
+        # '*rand_culled100_worst*random',
+        ]
     plot_loss_arrays(*groups, directory=test_dir)
