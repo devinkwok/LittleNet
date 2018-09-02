@@ -79,39 +79,6 @@ def build_30x10_probability_apd_net(dapd_by_labels):
     net.matrices[nn.mkey(0, 'weights')] = dapd
     return net
 
-#deprecated
-def build_stochastic_culled_net(inputs, labels, sizes=(784, 30, 10), percent_to_keep=0.1):
-    source_size = [sizes[0], int(sizes[1] / percent_to_keep), sizes[2]]
-    net = nn.NeuralNet(source_size)
-    # indexes to delete, not keep
-    best_indexes, neutral_indexes, worst_indexes = [], [], []
-
-    i = 1
-    original_size = source_size[i]
-    target_size = sizes[i]
-    # randomly pick neurons for neutral
-    neutral_index = np.arange(original_size)
-    np.random.shuffle(neutral_index)
-    neutral_indexes.append(neutral_index[target_size:])
-    # prepare apds
-    #TODO: running out of memory here
-    activations = net.pass_forward(inputs)
-    activations = activations[nn.mkey(i, 'post_activation')]
-    dapd_per_neuron = apd.cost(apd.apd_area(
-        apd.diff_by_label(activations, labels, num_buckets=30, chunk_size=250)), dim='labels')
-    # sort smallest to largest
-    dapd_indexes = dapd_per_neuron.argsort()
-    # pick biggest apd diff for best (remove all except end)
-    best_indexes.append(dapd_indexes[:-1 * target_size].values)
-    # pick smallest apd diff for worst (remove after beginning)
-    worst_indexes.append(dapd_indexes[target_size:].values)
-
-    best_indexes.append([])
-    neutral_indexes.append([])
-    worst_indexes.append([])
-
-    return net.delete_neurons(best_indexes), net.delete_neurons(neutral_indexes), net.delete_neurons(worst_indexes)
-
 def build_stochastic_culled_net_v2(inputs, labels, sizes=(784, 30, 10),
     num_to_search=100, dapd_by_labels=None, dapd_scale_factor=2):
     

@@ -41,9 +41,9 @@ def read_idx_images(filename):
                       [0] for d in range(dims))
         images = np.fromstring(file.read(), dtype=np.uint8).reshape(shape)
         images = normalize_images(images)
-        images = xr.DataArray(images, dims=(nn.DIM_CASE, nn.DIM_IN_Y, nn.DIM_IN_X),
+        images = xr.DataArray(images, dims=(nn.DIM_CASE, nn.DIM_Y, nn.DIM_X),
                               coords={nn.DIM_CASE: np.arange(images.shape[0])})
-        return images.stack(inputs=(nn.DIM_IN_Y, nn.DIM_IN_X))
+        return images.stack(inputs=(nn.DIM_Y, nn.DIM_X))
 
 
 def read_idx_labels(filename):
@@ -172,7 +172,7 @@ def shuffle_pixels(images, deep_copy=True):
     """
 
     image_np_array = unstack_copy(images, deep_copy=deep_copy).transpose(
-        nn.DIM_IN_Y, nn.DIM_IN_X, nn.DIM_CASE).values
+        nn.DIM_Y, nn.DIM_X, nn.DIM_CASE).values
     random_images = np.empty(image_np_array.shape)
     for coord_x in range(image_np_array.shape[0]):
         for coord_y in range(image_np_array.shape[1]):
@@ -180,9 +180,9 @@ def shuffle_pixels(images, deep_copy=True):
             np.random.shuffle(column)
             random_images[coord_x, coord_y, :] = column
     random_images = xr.DataArray(image_np_array,
-                                 dims=(nn.DIM_IN_Y, nn.DIM_IN_X, nn.DIM_CASE)).transpose(
-                                     nn.DIM_CASE, nn.DIM_IN_Y, nn.DIM_IN_X).stack(
-                                         inputs=(nn.DIM_IN_Y, nn.DIM_IN_X))
+                                 dims=(nn.DIM_Y, nn.DIM_X, nn.DIM_CASE)).transpose(
+                                     nn.DIM_CASE, nn.DIM_Y, nn.DIM_X).stack(
+                                         inputs=(nn.DIM_Y, nn.DIM_X))
     return random_images
 
 
@@ -211,7 +211,7 @@ def random_noise(images, percent_noise=0.5, noise_stdev=0.1, deep_copy=True):
     ratio = ratio * noise_stdev + percent_noise
     ratio = np.minimum(np.maximum(ratio, 0), 1)
     image_array = image_array * (1 - ratio) + noise * ratio
-    return image_array.stack(inputs=(nn.DIM_IN_Y, nn.DIM_IN_X))
+    return image_array.stack(inputs=(nn.DIM_Y, nn.DIM_X))
 
 
 def rotate_images_90_deg(images, num_clockwise=1, deep_copy=True):
@@ -236,15 +236,15 @@ def rotate_images_90_deg(images, num_clockwise=1, deep_copy=True):
         return images
     if rotate_case == 2:
         return flip_images(flip_images(
-            images, dim=nn.DIM_IN_X, deep_copy=deep_copy), dim=nn.DIM_IN_Y, deep_copy=False)
+            images, dim=nn.DIM_X, deep_copy=deep_copy), dim=nn.DIM_Y, deep_copy=False)
     # flip axes to rotate along angled plane, then flip image to get rotation
     # flip x for counterclockwise, flip y for clockwise
     if rotate_case == 1:
         return flip_images(flip_images_on_angle(images, deep_copy=deep_copy),
-                           dim=nn.DIM_IN_X, deep_copy=False)
+                           dim=nn.DIM_X, deep_copy=False)
     # case 3
     return flip_images(flip_images_on_angle(images, deep_copy=deep_copy),
-                       dim=nn.DIM_IN_Y, deep_copy=False)
+                       dim=nn.DIM_Y, deep_copy=False)
 
 
 def flip_images_on_angle(images, topright_to_bottomleft=False, deep_copy=True):
@@ -267,15 +267,15 @@ def flip_images_on_angle(images, topright_to_bottomleft=False, deep_copy=True):
     image_array = unstack_copy(images, deep_copy=deep_copy)
     if topright_to_bottomleft:
         # reverse both axes then do angle flip
-        image_array = flip_images(flip_images(images, dim=nn.DIM_IN_X,
+        image_array = flip_images(flip_images(images, dim=nn.DIM_X,
                                               deep_copy=deep_copy),
-                                  dim=nn.DIM_IN_Y, deep_copy=False).unstack(nn.DIM_IN)
+                                  dim=nn.DIM_Y, deep_copy=False).unstack(nn.DIM_IN)
     image_array = image_array.rename(inputs_x='y_temp', inputs_y='x_temp')
-    image_array = image_array.rename(x_temp=nn.DIM_IN_X, y_temp=nn.DIM_IN_Y)
-    return image_array.stack(inputs=(nn.DIM_IN_Y, nn.DIM_IN_X))
+    image_array = image_array.rename(x_temp=nn.DIM_X, y_temp=nn.DIM_Y)
+    return image_array.stack(inputs=(nn.DIM_Y, nn.DIM_X))
 
 
-def flip_images(images, dim=nn.DIM_IN_Y, deep_copy=True):
+def flip_images(images, dim=nn.DIM_Y, deep_copy=True):
     """Flips images along given dimension.
 
     Arguments:
@@ -292,7 +292,7 @@ def flip_images(images, dim=nn.DIM_IN_Y, deep_copy=True):
 
     image_array = unstack_copy(images, deep_copy=deep_copy)
     image_array = image_array.isel({dim: slice(None, None, -1)})
-    return image_array.stack(inputs=(nn.DIM_IN_Y, nn.DIM_IN_X))
+    return image_array.stack(inputs=(nn.DIM_Y, nn.DIM_X))
 
 
 def quarter_images(images, deep_copy=True):
@@ -312,10 +312,10 @@ def quarter_images(images, deep_copy=True):
     """
 
     image_array = unstack_copy(images, deep_copy=deep_copy)
-    x_size = math.floor(image_array.sizes[nn.DIM_IN_X] / 2)
-    y_size = math.floor(image_array.sizes[nn.DIM_IN_Y] / 2)
-    image_array = image_array.roll(**{nn.DIM_IN_Y: y_size, nn.DIM_IN_X: x_size})
-    return image_array.stack(**{nn.DIM_IN: (nn.DIM_IN_Y, nn.DIM_IN_X)})
+    x_size = math.floor(image_array.sizes[nn.DIM_X] / 2)
+    y_size = math.floor(image_array.sizes[nn.DIM_Y] / 2)
+    image_array = image_array.roll(**{nn.DIM_Y: y_size, nn.DIM_X: x_size})
+    return image_array.stack(**{nn.DIM_IN: (nn.DIM_Y, nn.DIM_X)})
 
 
 def square_kernel(kernel_width=4, falloff_width=4):
@@ -366,12 +366,12 @@ def tile_kernel(np_kernel, fill_dims=(28, 28), stride=(4, 4), tile_dim=nn.DIM_OU
 
     tiles = []
     shape = np_kernel.shape
-    kernel = xr.DataArray(np.zeros(fill_dims), dims=(nn.DIM_IN_Y, nn.DIM_IN_X))
+    kernel = xr.DataArray(np.zeros(fill_dims), dims=(nn.DIM_Y, nn.DIM_X))
     kernel[:shape[0], :shape[1]] = np_kernel
     for i in range(0, fill_dims[0] - shape[0]+1, stride[0]):
         for j in range(0, fill_dims[1] - shape[1] + 1, stride[1]):
-            tiles.append(kernel.roll(**{nn.DIM_IN_Y: i, nn.DIM_IN_X: j}))
-    return xr.concat(tiles, tile_dim).stack(inputs=(nn.DIM_IN_Y, nn.DIM_IN_X))
+            tiles.append(kernel.roll(**{nn.DIM_Y: i, nn.DIM_X: j}))
+    return xr.concat(tiles, tile_dim).stack(inputs=(nn.DIM_Y, nn.DIM_X))
 
 
 def plot_layer_weights(neural_net, layer=0, shape=None):
@@ -392,8 +392,8 @@ def plot_layer_weights(neural_net, layer=0, shape=None):
     if not shape is None:
         weights = weights.transpose(nn.DIM_IN, nn.DIM_OUT)
         weights = xr.DataArray(weights.values.reshape((*shape, weights.sizes[nn.DIM_OUT])),
-                               dims=(nn.DIM_IN_Y, nn.DIM_IN_X, nn.DIM_OUT))
-        weights.plot(x=nn.DIM_IN_X, y=nn.DIM_IN_Y, col=nn.DIM_OUT, col_wrap=10)
+                               dims=(nn.DIM_Y, nn.DIM_X, nn.DIM_OUT))
+        weights.plot(x=nn.DIM_X, y=nn.DIM_Y, col=nn.DIM_OUT, col_wrap=10)
     else:
         weights.plot()
 

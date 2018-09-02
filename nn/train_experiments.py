@@ -5,12 +5,59 @@ import matplotlib.pyplot as plt
 from cycler import cycler
 import neural_net as nn
 import utility
-from train import write_nn, train_nn, train_with_noise, train_with_random, \
-    train_with_shuffled, train_with_shuffled_random_noise, build_kernel_net
+import nn.train as train
 
 PLOT_COLORS = ['tab:blue', 'tab:cyan', 'tab:gray', 'tab:orange', 'tab:red', 'tab:green',
     'tab:purple', 'tab:brown', 'tab:pink', 'tab:olive']
-PLOT_LINESTYLES = ["-","--","-.",":"]
+PLOT_LINESTYLES = ["-", "--", "-.", ":"]
+
+def train_with_shuffled(net, inputs, labels, test_inputs, test_labels, proportion=0.5):
+    random_inputs = utility.shuffle_pixels(inputs)
+    random_inputs = random_inputs.isel(cases=slice(int(inputs.sizes['cases'] * proportion)))
+    random_labels = train.empty_labels(random_inputs)
+    inputs = train.combine_arrays(inputs, random_inputs)
+    labels = train.combine_arrays(labels, random_labels)
+    return train.train_nn(net, *train.shuffle_indexes(inputs, labels), test_inputs, test_labels)
+    
+def train_with_random(net, inputs, labels, test_inputs, test_labels, proportion=0.5):
+    random_inputs = utility.random_noise(inputs, percent_noise=1, noise_stdev=0)
+    random_inputs = random_inputs.isel(cases=slice(int(inputs.sizes['cases'] * proportion)))
+    random_labels = train.empty_labels(random_inputs)
+    inputs = train.combine_arrays(inputs, random_inputs)
+    labels = train.combine_arrays(labels, random_labels)
+    return train.train_nn(net, *train.shuffle_indexes(inputs, labels), test_inputs, test_labels)
+
+def train_with_noise(net, inputs, labels, test_inputs, test_labels, noise_percent=0.2):
+    # noises = [utility.random_noise(inputs.isel(
+    #     cases=0), percent_noise=i / 20, noise_stdev=0.1) for i in range(21)]
+    # xr.concat(noises, dim='noises').unstack('inputs').plot(
+    #     x='inputs_x', y='inputs_y', col='noises', col_wrap=5)
+    # plt.show()
+    inputs = utility.random_noise(inputs, percent_noise=noise_percent)
+    return train.train_nn(net, inputs, labels, test_inputs, test_labels)
+
+def train_with_shuffled_random_noise(net, inputs, labels, test_inputs, test_labels,
+    shuffled_proportion=0.5, random_proportion=0.5, noise_percent=0.2):
+
+    shuffled_inputs = utility.shuffle_pixels(inputs)
+    shuffled_inputs = shuffled_inputs.isel(cases=slice(int(inputs.sizes['cases'] * shuffled_proportion)))
+    shuffled_labels = train.empty_labels(shuffled_inputs)
+    random_inputs = utility.random_noise(inputs, percent_noise=1, noise_stdev=0)
+    random_inputs = random_inputs.isel(cases=slice(int(inputs.sizes['cases'] * random_proportion)))
+    random_labels = train.empty_labels(random_inputs)
+    inputs = utility.random_noise(inputs, percent_noise=noise_percent)
+    inputs = train.combine_arrays(inputs, random_inputs, shuffled_inputs)
+    labels = train.combine_arrays(labels, random_labels, shuffled_labels)
+    return train.train_nn(net, *train.shuffle_indexes(inputs, labels), test_inputs, test_labels)
+
+def build_kernel_net():
+    first_layer = utility.tile_kernel(utility.square_kernel(3, 3), stride=(4, 4)).transpose('inputs', 'neurons')
+    # first_layer.unstack('inputs').transpose('inputs_y', 'inputs_x', 'neurons').plot(
+    #     x='inputs_x', y='inputs_y', col='neurons', col_wrap=10)
+    # plt.show()
+    net = nn.NeuralNet((784, first_layer.sizes['neurons'], 10))
+    net.matrices[nn.mkey(0, 'weights')] = first_layer.reset_index('inputs', drop=True)
+    return net
 
 def plot_loss_arrays(*filename_filters, directory='/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment/', filename_prefix='progress-'):
     arr, net_names = [], []
@@ -38,15 +85,15 @@ def plot_loss_arrays(*filename_filters, directory='/home/devin/d/data/src/abstra
     plt.show()
 
 def train_on_various_data(net, inputs, labels, test_inputs, test_labels, name='net', save_dir=''):
-    write_nn(*train_nn(
+    train.write_nn(*train.train_nn(
         net, inputs, labels, test_inputs, test_labels), name=name + '_regular', save_dir=save_dir)
-    write_nn(*train_with_shuffled(
+    train.write_nn(*train_with_shuffled(
         net, inputs, labels, test_inputs, test_labels), name=name + '_shuffled', save_dir=save_dir)
-    write_nn(*train_with_random(
+    train.write_nn(*train_with_random(
         net, inputs, labels, test_inputs, test_labels), name=name + '_random', save_dir=save_dir)
-    write_nn(*train_with_noise(
+    train.write_nn(*train_with_noise(
         net, inputs, labels, test_inputs, test_labels), name=name + '_noise', save_dir=save_dir)
-    write_nn(*train_with_shuffled_random_noise(
+    train.write_nn(*train_with_shuffled_random_noise(
         net, inputs, labels, test_inputs, test_labels), name=name + '_shuffled_random_noise_combo', save_dir=save_dir)
 
 # trains a randomly initialized network with differing types of noise in data

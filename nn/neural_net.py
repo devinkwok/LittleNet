@@ -5,22 +5,22 @@ import xarray as xr
 
 
 DIM_LABEL = 'labels'
-"""Dimension key for onehot vector dimension, used in xarray"""
+"""xarray dimension name for onehot vector"""
 
 DIM_CASE = 'cases'
-"""Dimension key along which inputs in the same batch are ordered, used in xarray"""
+"""xarray dimension name along which inputs in the same batch are stacked"""
 
-DIM_IN_X = 'inputs_x'
-"""Dimension key for 2-D inputs in horizontal axis, used in xarray"""
+DIM_X = 'inputs_x'
+"""xarray dimension name for 2-D images in horizontal axis"""
 
-DIM_IN_Y = 'inputs_y'
-"""Dimension key for 2-D inputs in vertical axis, used in xarray"""
+DIM_Y = 'inputs_y'
+"""xarray dimension name for 2-D images in vertical axis"""
 
 DIM_IN = 'inputs'
-"""Dimension key for input dimension, used in xarray"""
+"""xarray dimension name for input dimension of matrix"""
 
 DIM_OUT = 'neurons'
-"""Dimension key for output dimension, used in xarray"""
+"""xarray dimension name for output dimension of matrix"""
 
 KEY_WEIGHT = 'weights'
 """Dictionary key for weight arrays, used as argument_name in mkey()"""
@@ -47,6 +47,7 @@ def mkey(layer, argument_name):
     Returns:
         str -- dict key for NeuralNet.matrices
     """
+
     return 'layer' + str(layer) + ' ' + argument_name
 
 
