@@ -1,11 +1,12 @@
+"""Integration tests for neural_net.py"""
+
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import neural_net as nn
-from neural_net import mkey
-from misc import nn_old
-import utility
-import train
+from test.misc import nn_old
+from littlenet import utility
+from littlenet import train
 
 # should draw a 2D surface with points of 2 colours, surface should orient to match colors of points
 def test_2in_1out():
@@ -69,7 +70,7 @@ def test_1in_1out():
     test_inputs = np.divide(np.arange(NUM_TESTS), NUM_TESTS)
     xarray_inputs = xr.DataArray(test_inputs.reshape((NUM_TESTS, 1)), dims=('cases', 'inputs'))
     goal_outputs = target_function_1D(xarray_inputs).squeeze()
-    net_outputs = net.pass_forward(xarray_inputs)[mkey(len(SIZES)-1, 'post_activation')].squeeze()
+    net_outputs = net.pass_forward(xarray_inputs)[nn.mkey(len(SIZES)-1, 'post_activation')].squeeze()
     goal_outputs.assign_coords(cases=test_inputs)
     net_outputs.assign_coords(cases=test_inputs)
     goal_outputs.plot()
@@ -81,25 +82,25 @@ def test_compare():
     net = nn.NeuralNet(SIZES, func_fill=np.ones)
     inputs = xr.DataArray(np.ones((3,)), dims=('inputs'))
     activations = net.pass_forward(inputs)
-    pre_activations = [activations[mkey(i, 'pre_activation')].values.reshape((1, SIZES[i])) for i in range(len(SIZES))]
-    gradient = np.subtract(np.ones((1,)), activations[mkey(len(SIZES) - 1, 'post_activation')]).values.reshape((1,1))
+    pre_activations = [activations[nn.mkey(i, 'pre_activation')].values.reshape((1, SIZES[i])) for i in range(len(SIZES))]
+    gradient = np.subtract(np.ones((1,)), activations[nn.mkey(len(SIZES) - 1, 'post_activation')]).values.reshape((1,1))
     old_output = nn_old.pass_back(pre_activations, gradient, nn_old.create_tensor(SIZES, fillFunction=np.ones))
     output = net.pass_back(activations, xr.DataArray([1], dims=('labels')))
     for layer in range(len(SIZES) - 1):
         print('LAYER', layer, 'WEIGHTS:\nold:', old_output['w'][layer].tolist(),
-            '\nnew:', output[mkey(layer, 'weights')].values.tolist(),
+            '\nnew:', output[nn.mkey(layer, 'weights')].values.tolist(),
             '\nLAYER', layer, 'BIASES:\nold:', old_output['b'][layer].tolist(),
-            '\nnew:', output[mkey(layer, 'biases')].values.tolist(), '\n')
+            '\nnew:', output[nn.mkey(layer, 'biases')].values.tolist(), '\n')
 
 # accuracy should rise to approx. 90 (depends on random initialization), loss should reduce to < 0.02
 def test_mnist():
-    images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
-    labels = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
+    images = utility.read_idx_images('../../mnist_data/train-images.idx3-ubyte')
+    labels = utility.read_idx_labels('../../mnist_data/train-labels.idx1-ubyte')
     labels = utility.make_onehot(labels, np.arange(10))
     return train.train_regular(nn.NeuralNet((784, 30, 10)), images, labels)
 
 if __name__ == '__main__':
-    # test_2in_1out()
-    # test_1in_1out()
+    test_2in_1out()
+    test_1in_1out()
     test_compare()
     test_mnist()

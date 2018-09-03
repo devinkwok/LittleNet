@@ -2,9 +2,9 @@ import copy
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
-import apd
-import utility
-import neural_net as nn
+from littlenet import apd
+from littlenet import utility
+from littlenet import neural_net as nn
 
 def apply_to_all_layers(net, activations, func, start_layer=1):
     for i in range(start_layer, net.num_layers + 1):
@@ -136,13 +136,13 @@ def build_stochastic_culled_net_v2(inputs, labels, sizes=(784, 30, 10),
     return best_net, control_net, worst_net
 
 def test_experiments():
-    untrained_net = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/neuralnet-0-untrained.pyc')
-    trained_net = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/neuralnet-trained-without-random.pyc')
-    trained_with_random_net = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/neuralnet-trained-with-random.pyc')
-    trained_with_noise = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/neuralnet-trained-with-noise.pyc')
-    kernel_net = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/neuralnet-trained-from-artificial-kernel.pyc')
-    images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
-    labels = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
+    untrained_net = utility.read_object('./models/neuralnet-0-untrained.pyc')
+    trained_net = utility.read_object('./models/neuralnet-trained-without-random.pyc')
+    trained_with_random_net = utility.read_object('./models/neuralnet-trained-with-random.pyc')
+    trained_with_noise = utility.read_object('./models/neuralnet-trained-with-noise.pyc')
+    kernel_net = utility.read_object('./models/neuralnet-trained-from-artificial-kernel.pyc')
+    images = utility.read_idx_images('./mnist_data/train-images.idx3-ubyte')
+    labels = utility.read_idx_labels('./mnist_data/train-labels.idx1-ubyte')
     labels_onehot = utility.make_onehot(labels, np.arange(10))
     #TODO: remove dead neurons, prune correlated neuron pairs
     # utility.plot_layer_weights(untrained_net)
@@ -154,26 +154,26 @@ def test_experiments():
     test_net(kernel_net, utility.rotate_images_90_deg(images), labels)
 
 if __name__ == '__main__':
-    images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
-    labels = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
+    images = utility.read_idx_images('./mnist_data/train-images.idx3-ubyte')
+    labels = utility.read_idx_labels('./mnist_data/train-labels.idx1-ubyte')
     
     # dapd_by_labels = experiment_dapd_by_label(images, labels)
-    # utility.write_object(dapd_by_labels, '/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_0_noise.pyc')
+    # utility.write_object(dapd_by_labels, './models/dapd/dapd_by_labels_0_noise.pyc')
     # dapd_20_noise = experiment_dapd_by_label(utility.random_noise(images, percent_noise=0.2), labels)
-    # utility.write_object(dapd_20_noise, '/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_20_noise.pyc')
+    # utility.write_object(dapd_20_noise, './models/dapd/dapd_by_labels_20_noise.pyc')
     # dapd_50_noise = experiment_dapd_by_label(utility.random_noise(images, percent_noise=0.5), labels)
-    # utility.write_object(dapd_50_noise, '/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_50_noise.pyc')
+    # utility.write_object(dapd_50_noise, './models/dapd/dapd_by_labels_50_noise.pyc')
 
-    dapd_by_labels = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_0_noise.pyc')
-    # dapd_20_noise = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_20_noise.pyc')
-    # dapd_50_noise = utility.read_object('/home/devin/d/data/src/abstraction/neural_net_v2/models/dapd/dapd_by_labels_50_noise.pyc')
-    # utility.write_object(build_10x1_input_apd_net(dapd_by_labels), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x1_label_dapd.pyc')
-    # utility.write_object(build_10x10_input_apd_net(dapd_by_labels), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x10_label_dapd.pyc')
-    # utility.write_object(build_10x1_input_apd_net(dapd_50_noise), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x1_label_dapd_50_noise.pyc')
-    # utility.write_object(build_10x10_input_apd_net(dapd_50_noise), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x10_label_dapd_50_noise.pyc')
-    # utility.write_object(build_30x10_probability_apd_net(dapd_by_labels), '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/untrained_10x10_label_dapd.pyc')
+    dapd_by_labels = utility.read_object('./models/dapd/dapd_by_labels_0_noise.pyc')
+    # dapd_20_noise = utility.read_object('./models/dapd/dapd_by_labels_20_noise.pyc')
+    # dapd_50_noise = utility.read_object('./models/dapd/dapd_by_labels_50_noise.pyc')
+    # utility.write_object(build_10x1_input_apd_net(dapd_by_labels), './models/experiment_apd_nets/untrained_10x1_label_dapd.pyc')
+    # utility.write_object(build_10x10_input_apd_net(dapd_by_labels), './models/experiment_apd_nets/untrained_10x10_label_dapd.pyc')
+    # utility.write_object(build_10x1_input_apd_net(dapd_50_noise), './models/experiment_apd_nets/untrained_10x1_label_dapd_50_noise.pyc')
+    # utility.write_object(build_10x10_input_apd_net(dapd_50_noise), './models/experiment_apd_nets/untrained_10x10_label_dapd_50_noise.pyc')
+    # utility.write_object(build_30x10_probability_apd_net(dapd_by_labels), './models/experiment_apd_nets/untrained_10x10_label_dapd.pyc')
     
-    experiment_dir = '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_reg_vs_culled_1/'
+    experiment_dir = './models/experiment_reg_vs_culled_1/'
     num_trials = 5
     for i in range(1, num_trials):
         if i > 1:

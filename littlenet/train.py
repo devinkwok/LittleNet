@@ -3,8 +3,8 @@
 import itertools
 import numpy as np
 import xarray as xr
-import neural_net as nn
-import utility
+from littlenet import neural_net as nn
+from littlenet import utility
 
 
 def shuffle_indexes(*xr_arrays, shuffle_dim=nn.DIM_CASE):

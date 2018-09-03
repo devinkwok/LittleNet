@@ -3,8 +3,8 @@
 import unittest
 import numpy as np
 import xarray as xr
-import nn.neural_net as nn
-import nn.utility as util
+from littlenet import neural_net as nn
+from littlenet import utility as util
 
 
 class UtilityTest(unittest.TestCase):

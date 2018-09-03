@@ -3,8 +3,8 @@
 import unittest
 import numpy as np
 import xarray as xr
-import nn.apd as apd
-import nn.neural_net as nn
+from littlenet import apd
+from littlenet import neural_net as nn
 
 
 class ApdTest(unittest.TestCase):

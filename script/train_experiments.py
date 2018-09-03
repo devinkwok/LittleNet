@@ -3,9 +3,10 @@ import xarray as xr
 import pandas as pd
 import matplotlib.pyplot as plt
 from cycler import cycler
-import neural_net as nn
-import utility
-import nn.train as train
+from littlenet import neural_net as nn
+from littlenet import neural_net
+from littlenet import utility
+from littlenet import train
 
 PLOT_COLORS = ['tab:blue', 'tab:cyan', 'tab:gray', 'tab:orange', 'tab:red', 'tab:green',
     'tab:purple', 'tab:brown', 'tab:pink', 'tab:olive']
@@ -134,8 +135,8 @@ def plot_all_nets(directory, key='untrained_'):
     plt.show()
 
 if __name__ == '__main__':
-    images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
-    labels_onehot = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
+    images = utility.read_idx_images('./mnist_data/train-images.idx3-ubyte')
+    labels_onehot = utility.read_idx_labels('./mnist_data/train-labels.idx1-ubyte')
     labels_onehot = utility.make_onehot(labels_onehot, np.arange(10))
     num_input_cases = 50000
     num_tests = 1000
@@ -144,11 +145,11 @@ if __name__ == '__main__':
     test_inputs = images.isel(cases=slice(num_input_cases, num_input_cases + num_tests))
     test_labels = labels_onehot.isel(cases=slice(num_input_cases, num_input_cases + num_tests))
 
-    test_dir = '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_reg_vs_culled_1/'
+    test_dir = './models/experiment_reg_vs_culled_1/'
     # test_dir = '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/'
     # experiment_randomized_data_random_vs_kernel(inputs, labels, test_inputs, test_labels)
 
-    plot_all_nets(test_dir, key='untrained_30x10_control')
+    # plot_all_nets(test_dir, key='untrained_30x10_control')
     # experiment_all_nets(test_dir)
     # plot_all_nets(test_dir, key='trained-')
 

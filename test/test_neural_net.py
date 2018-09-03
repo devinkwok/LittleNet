@@ -6,8 +6,8 @@ import string
 import unittest
 import numpy as np
 import xarray as xr
-import nn.neural_net as nn
-import utility
+from littlenet import neural_net as nn
+from littlenet import utility
 
 LAYER_SIZES = [10, 5, 2]
 NUM_LAYERS = len(LAYER_SIZES)-1

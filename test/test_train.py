@@ -3,8 +3,8 @@
 import unittest
 import numpy as np
 import xarray as xr
-import nn.neural_net as nn
-import nn.train as train
+from littlenet import neural_net as nn
+from littlenet import train as train
 
 class TrainTest(unittest.TestCase):
 
@@ -58,3 +58,6 @@ class TrainTest(unittest.TestCase):
     #     #TODO why is benchmark not returning the same thing as test_nn?
     #     NeuralNetTest.assert_nn_equal(NeuralNetTest, last, last2)
     #     [np.testing.assert_allclose(a, b) for a, b in zip(loss_arr, loss_arr2)]
+
+if __name__ == '__main__':
+    unittest.main()

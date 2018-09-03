@@ -4,7 +4,7 @@ neural network. Currently APDs are modelled as histograms."""
 
 import numpy as np
 import xarray as xr
-import neural_net as nn
+from littlenet import neural_net as nn
 
 DIM_HIST = 'histogram_buckets'
 """xarray dimension key for histogram buckets"""

@@ -7,7 +7,7 @@ import copy
 import math
 import numpy as np
 import xarray as xr
-import neural_net as nn
+from littlenet import neural_net as nn
 
 
 def normalize_images(np_array):
@@ -102,22 +102,20 @@ def read_object(filename):
         return obj
 
 
-def read_all_objects(directory, pattern, suffix='.pyc'):
+def read_all_objects(directory='./', pattern='*', suffix='pyc'):
     """Reads multiple files from a directory that match a pattern using read_object().
 
-    Arguments:
-        directory {str} -- directory to search
-        pattern {str} -- filename pattern, uses glob.glob()
-
     Keyword Arguments:
-        suffix {str} -- filename suffix (default: {'.pyc'})
+        directory {str} -- directory to search (default {'./'})
+        pattern {str} -- filename pattern using glob.glob() (default {'*'})
+        suffix {str} -- filename suffix (default: {'pyc'})
 
     Returns:
         list(object) -- list of objects from each file
     """
 
     objs = []
-    for filename in glob.glob(directory + pattern + suffix):
+    for filename in glob.glob(directory + '/' + pattern + '.' + suffix):
         objs.append((os.path.split(filename)[1], read_object(filename)))
     return objs
 
