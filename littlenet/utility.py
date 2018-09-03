@@ -106,7 +106,7 @@ def read_all_objects(directory='./', pattern='*', suffix='pyc'):
     """Reads multiple files from a directory that match a pattern using read_object().
 
     Keyword Arguments:
-        directory {str} -- directory to search (default {'./'})
+        directory {str} -- directory to search, no trailing slash (default {'./'})
         pattern {str} -- filename pattern using glob.glob() (default {'*'})
         suffix {str} -- filename suffix (default: {'pyc'})
 
@@ -120,15 +120,19 @@ def read_all_objects(directory='./', pattern='*', suffix='pyc'):
     return objs
 
 
-def write_object(obj, filename):
+def write_object(obj, filename, directory='./', suffix='pyc'):
     """Convenience function for writing object to file using pickle.
 
     Arguments:
         obj {object} -- object to write
         filename {str} -- path to file
-    """
 
-    with open(filename, 'wb') as file:
+    Keyword Arguments:
+        directory {str} -- directory to search, no trailing slash (default {'./'})
+    """
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    with open(directory + '/' + filename + '.' + suffix, 'wb') as file:
         pickle.dump(obj, file)
 
 

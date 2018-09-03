@@ -8,7 +8,7 @@ target = './models_new'
 subdirs = [x for x in os.walk(source)][0][1]
 for dir_name in subdirs:
     print(dir_name)
-    for name, obj in utility.read_all_objects(source + '/' + dir_name):
+    for name, obj in utility.read_all_objects(dir=source + '/' + dir_name):
         print(name)
         newpath = target + '/' + dir_name + '/'
         if not os.path.exists(newpath):

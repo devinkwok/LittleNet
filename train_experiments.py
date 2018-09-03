@@ -60,10 +60,10 @@ def build_kernel_net():
     net.matrices[nn.mkey(0, 'weights')] = first_layer.reset_index('inputs', drop=True)
     return net
 
-def plot_loss_arrays(*filename_filters, directory='/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment/', filename_prefix='progress-'):
+def plot_loss_arrays(*filename_filters, directory='/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment/', prefix='progress-'):
     arr, net_names = [], []
     for filename in filename_filters:
-        loss_arrs = utility.read_all_objects(directory, filename_prefix + filename)
+        loss_arrs = utility.read_all_objects(directory=directory, pattern=prefix + filename)
         for name, array in loss_arrs:
             temp = np.array(array)
             acc = xr.DataArray(temp[:, 1], dims=('cases'),
@@ -121,14 +121,14 @@ def experiment_benchmark_params():
     pass
 
 def experiment_all_nets(directory, key='untrained_'):
-    for name, net in utility.read_all_objects(directory, key + '*'):
+    for name, net in utility.read_all_objects(directory=directory, pattern=key + '*'):
         name = name.split(key)[-1].split('.pyc')[0]
         print('TRAINING', name)
         train_on_various_data(net, inputs, labels, test_inputs, test_labels,
             name=name, save_dir=directory)
 
 def plot_all_nets(directory, key='untrained_'):
-    for name, net in utility.read_all_objects(directory, key + '*'):
+    for name, net in utility.read_all_objects(directory=directory, pattern=key + '*'):
         name = name.split(key)[-1].split('.pyc')[0]
         print(name)
         utility.plot_layer_weights(net, layer=0, shape=(28, 28))
@@ -149,8 +149,8 @@ if __name__ == '__main__':
     # test_dir = '/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment_apd_nets/'
     # experiment_randomized_data_random_vs_kernel(inputs, labels, test_inputs, test_labels)
 
-    # plot_all_nets(test_dir, key='untrained_30x10_control')
-    # experiment_all_nets(test_dir)
+    plot_all_nets(test_dir, key='untrained_30x10_control')
+    experiment_all_nets(test_dir)
     # plot_all_nets(test_dir, key='trained-')
 
     groups = [
