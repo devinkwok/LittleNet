@@ -2,8 +2,8 @@ LittleNet: a simple neural network with exploration tools
 =========================================================
 An implementation of a simple neural network that trains on the MNIST dataset. I wrote this to get a deeper understanding of neural networks without using existing libraries (Tensorflow, Keras). The code prioritizes being easier to read and extend, rather than brevity and cleverness. Experiments currently being conducted with this network include:
 
- - [Using activation probabilities to choose initial parameters](./experiment-init-apd.md)
- - [Manually designing initial parameters](./experiment-init-kernel.md)
+ - [Using activation probabilities to choose initial parameters](./article/experiment-init-apd.md)
+ - [Manually designing initial parameters](./article/experiment-init-kernel.md)
 
 Requirements
 ------------

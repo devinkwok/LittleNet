@@ -77,9 +77,10 @@ plt.show()
 ![Difference in probability distribution area between entire dataset and "7"s only](./image/init-apd-output-7diff.png)
 
 In the chart above, the areas of each histogram have been summed to make them easier to compare. The
-activation for the neuron representing "7" clearly shows a larger difference than the other
+activation for the neuron representing "7" clearly shows a spike in difference compared to the other
 neurons. This makes sense, since we are comparing the activations of all the test data versus the data
-containing only "7"s.
+containing only "7"s. The activations of the neuron representing "7" have jumped from near 0. to near 1.0,
+giving it the largest difference, whereas the activations of the other neurons remain near 0.
 
 Plotting the activation differences for the input layer creates an interesting picture, showing
 which pixels are varying the most for each digit:
@@ -120,17 +121,18 @@ train.plot_progress([('diffnaive', progress_net_diffnaive)])
 
 ![Training progress for a naive approach](./image/init-apd-naive-progress.png)
 
-
 The result is terrible. This is probably because we have not accounted for whether the difference for
-each pixel tends towards being positive or negative. We probably also want an extra intermediate
-layer, but we'll leave further experiments in this direction for another time.
+each pixel tends towards being positive or negative. We would probably also get better results with
+an additional intermediate layer, but we'll leave further experiments in this direction for another time.
 
 Instead of initializing parameters directly, we can use the activation probabilities to evaluate
 randomly generated neuron weights. First, we find the activation probability difference between
 each label and the dataset. Then, we sum up the resulting difference areas with a cost function.
-We can then choose the neurons with the highest differences as the best, and neurons with least
-differences as the worst. Randomly chosen neurons are our control sample. The actual code to do this
-is quite lengthy, so I've put it in the apd.py module.
+We can then choose the neurons with the highest costs as the best, since they show the most variance
+for the labels we want to train the neural net to recognize, and neurons with the lowest costs
+as the worst. Randomly chosen neurons are our control sample.
+
+The actual code to do this is quite lengthy, so I've put it in the apd.py module:
 
 """
 # num_to_search is the number of candidates considered per neuron, so more candidates should cause more extreme performance

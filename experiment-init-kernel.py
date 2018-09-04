@@ -61,7 +61,10 @@ utility.plot_first_layers(trained_nets)
 
 ![Trained randomly initialized net weights for first layer](./image/kernel-control-trained-weights.png)
 
-However, when plotting each network's accuracy and loss progress...
+In some of the kernel initialized neurons, the kernels remain clearly visible and unchanged.
+This likely means those neurons are not being used by the output layer.
+
+As for plotting each network's accuracy and loss progress...
 
 """
 progress_rand = utility.read_all_objects('./models/kernel', pattern='progress*rand*')

@@ -19,7 +19,7 @@ let's make a set of neurons that have weights in the shape of a dot, like a set
 of convolutional kernels. We also randomly initialize networks with the same
 layer sizes as a control:
 
-```
+```python
 import numpy as np, xarray as xr, matplotlib.pyplot as plt
 from littlenet import apd, utility, neural_net as nn, train
 
@@ -30,7 +30,7 @@ kernel_nets = [*utility.build_kernel_net(6, 6, (2, 2)),
 
 The network's first layer weights look like this for the kernel and control nets:
 
-```
+```python
 utility.plot_first_layers(kernel_nets)
 ```
 
@@ -40,7 +40,7 @@ utility.plot_first_layers(kernel_nets)
 
 Now we train all of the generated networks:
 
-```
+```python
 kernel_nets = utility.read_all_objects('./models/kernel', pattern='net_*')
 inputs, labels, test_inputs, test_labels = utility.training_and_test_inputs()
 
@@ -51,7 +51,7 @@ trained_nets, progress = train.train_all(kernel_nets,
 
 The trained weights for each net are clearly different.
 
-```
+```python
 trained_nets = utility.read_all_objects('./models/kernel', pattern='trained_*')
 utility.plot_first_layers(trained_nets)
 ```
@@ -60,9 +60,12 @@ utility.plot_first_layers(trained_nets)
 
 ![Trained randomly initialized net weights for first layer](./image/kernel-control-trained-weights.png)
 
-However, when plotting each network's accuracy and loss progress...
+In some of the kernel initialized neurons, the kernels remain clearly visible and unchanged.
+This likely means those neurons are not being used by the output layer.
 
-```
+As for plotting each network's accuracy and loss progress...
+
+```python
 progress_rand = utility.read_all_objects('./models/kernel', pattern='progress*rand*')
 progress_kernel = utility.read_all_objects('./models/kernel', pattern='progress*kernel*')
 train.plot_progress(progress_rand, progress_kernel)
