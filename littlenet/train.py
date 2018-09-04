@@ -3,6 +3,9 @@
 import itertools
 import numpy as np
 import xarray as xr
+import pandas as pd
+from cycler import cycler
+import matplotlib.pyplot as plt
 from littlenet import neural_net as nn
 from littlenet import utility
 
@@ -118,7 +121,7 @@ def evaluate_net(net, test_inputs, test_labels, num=0, do_print=True):
 
 
 def train_nn(net, train_inputs, train_labels, test_inputs, test_labels,
-             batch_size=10, training_rate=3.0, sample_rate=100, do_print=True):
+             sample_rate=100, do_print=True, hyperparams={}):
     """Trains a neural network and tracks the accuracy and loss.
 
     Arguments:
@@ -144,27 +147,21 @@ def train_nn(net, train_inputs, train_labels, test_inputs, test_labels,
     print_func = lambda *args, **kwargs: None
     if do_print:
         print_func = print
-    num_batches = int(train_inputs.sizes[nn.DIM_CASE] / batch_size)
-    inputs = train_inputs.groupby_bins(nn.DIM_CASE, num_batches)
-    labels = train_labels.groupby_bins(nn.DIM_CASE, num_batches)
-    last = net
-    count = 0
-    loss_arr = [evaluate_net(
-        last, test_inputs, test_labels, num=count * batch_size, do_print=do_print)]
+    new_net = net
+    progress = [evaluate_net(
+        new_net, test_inputs, test_labels, num=0, do_print=do_print)]
     print_func(end='\n')
-    for new_net, inputs, labels in net.train_yield(inputs, labels, training_rate=training_rate):
-        last = new_net
-        count += 1
-        if count * batch_size % sample_rate == 0:
-            loss_arr.append(evaluate_net(last, test_inputs, test_labels,
-                                         num=int(count * batch_size), do_print=do_print))
+    for new_net, case_num, batch_num, _, _ in net.train_yield(train_inputs, train_labels, **hyperparams):
+        if case_num % sample_rate == 0:
+            progress.append(evaluate_net(new_net, test_inputs, test_labels,
+                                         num=int(case_num), do_print=do_print))
             print_func(end='\r')
     print_func('\n ... done')
-    return last, loss_arr
+    return new_net, progress
 
 
 def write_nn(net, loss_array, name='net',
-             save_dir='../models/experiment/'):
+             save_dir='./models/experiment/'):
     """Convenience function for writing the trained net and tests from train_nn() to file.
 
     Arguments:
@@ -174,39 +171,58 @@ def write_nn(net, loss_array, name='net',
     Keyword Arguments:
         name {str} -- filename (default: {'net'})
         save_dir {str} -- directory to save to
-            (default: {'../models/experiment/'})
+            (default: {'./models/experiment/'})
     """
+    utility.write_object(net, 'trained_' + name, directory=save_dir)
+    utility.write_object(loss_array, 'progress_' + name, directory=save_dir)
 
-    utility.write_object(net, save_dir + 'trained_' + name + '.pyc')
-    utility.write_object(loss_array, save_dir + 'progress_' + name + '.pyc')
 
-#TODO: fix
-def benchmark(*name_net_input_label_tuples, test_inputs=None, test_labels=None,
-              max_batches=5000, num_cases=[50000], rates=[3.0], batch_sizes=[10], sample_rate=100,
-              save_dir='/home/devin/d/data/src/abstraction/neural_net_v2/models/experiment/', do_print=True):
-    for name, net, net_inputs, net_labels in name_net_input_label_tuples:
-        if not save_dir is None:
-            utility.write_object(
-                net, save_dir + 'net_untrained-' + name + '.pyc')
-        for case in num_cases:
-            train_inputs, train_labels = tile_shuffled_cases(net_inputs.isel(cases=slice(case)),
-                                                             net_labels.isel(cases=slice(case)), tile_size=max_batches * max(batch_sizes))
-
-            for batch, rate in utility.compose_params(batch_sizes, rates):
-                id_dict = {'name': name, nn.DIM_CASE: case,
-                           'batch_size': batch, 'training_rate': rate}
-                name_id = name + '-' + str(int(case)) + 'cases-' + str(int(batch)) + \
-                    'batchsize-' + str(rate) + 'rate'
-                if do_print:
-                    print('TRAINING', name_id)
-                num_cases_needed = int(batch * max_batches)
-                last, loss_arr = train_nn(net, train_inputs.isel(cases=slice(num_cases_needed)),
-                                          train_labels.isel(cases=slice(
-                                              num_cases_needed)), test_inputs, test_labels,
-                                          batch_size=batch, training_rate=rate, sample_rate=sample_rate, do_print=do_print)
+def train_all(name_net_tuples, name_input_label_tuples, hyperparam_dicts,
+              test_inputs, test_labels, sample_rate=100, save_dir=None):
+    trained_nets = []
+    trained_progress = []
+    for hyperparams in hyperparam_dicts:
+        for data_name, inputs, labels in name_input_label_tuples:
+            for net_name, net in name_net_tuples:
+                result_name = net_name + 'X' + data_name + '_'
+                for key, value in hyperparams.items():
+                    result_name = result_name + key + str(value)
+                print('TRAINING', result_name)
+                net, progress = train_nn(net, inputs, labels, test_inputs, test_labels,
+                                         sample_rate=sample_rate, hyperparams=hyperparams)
                 if not save_dir is None:
-                    utility.write_object(
-                        loss_arr, save_dir + 'progress-' + name_id + '.pyc')
-                    utility.write_object(
-                        last, save_dir + 'net_trained-' + name_id + '.pyc')
-                yield id_dict, last, loss_arr
+                    write_nn(net, progress, name=result_name, save_dir=save_dir)
+                trained_nets.append((result_name, net))
+                trained_progress.append((result_name, progress))
+    return trained_nets, trained_progress
+
+def plot_progress(*name_progress_tuples_groups):
+    plot_array, net_names = [], []
+    num_per_group = 0  # temporary hack to make cycler work:
+    # won't cycle styles properly if groups have different numbers of lines to plot
+    num_groups = len(name_progress_tuples_groups)
+    for name_progress_tuples in name_progress_tuples_groups:
+        num_per_group = len(name_progress_tuples)
+        for name, progress in name_progress_tuples:
+            temp = np.array(progress)
+            acc = xr.DataArray(temp[:, 1], dims=(nn.DIM_CASE),
+                coords={nn.DIM_CASE: temp[:, 0]})
+            loss = xr.DataArray(temp[:, 2], dims=(nn.DIM_CASE),
+                coords={nn.DIM_CASE: temp[:, 0]})
+            plot_array.append(acc)
+            plot_array.append(loss)
+            net_names.append(name + ' acc')
+            net_names.append(name + ' loss')
+    net_names_coords = pd.MultiIndex.from_arrays([net_names, np.arange(len(net_names))])
+    if not plot_array:
+        return # nothing to plot
+    arr = xr.concat(plot_array, dim='nets').assign_coords(nets=net_names_coords)
+    # temporary color cycling
+    plot_colors = ['tab:blue', 'tab:red', 'tab:green', 'tab:gray', 'tab:orange', 'tab:purple', 'tab:brown',
+                   'tab:pink', 'tab:cyan', 'tab:olive']
+    plot_linestyles = cycler('linestyle', ["-", "--", "-.", ":"]) * cycler('lw', [2, 2, 1, 1])
+    plt.rc('lines', linewidth=2)
+    plt.rc('axes', prop_cycle=cycler('color', plot_colors)[:num_groups] * plot_linestyles[:num_per_group * 2])
+    plt.rc('legend')
+    arr.plot(x=nn.DIM_CASE, hue='nets')
+    plt.show()

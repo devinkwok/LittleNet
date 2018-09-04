@@ -31,13 +31,11 @@ def test_2in_1out():
     labels = xr.DataArray(np.greater(func_probability(inputs), np.random.rand(NUM_BATCHES * NUM_CASES)), dims=('cases'))
     labels = labels.expand_dims('labels')
     net = nn.NeuralNet((2, 1))
-    count = 0
-    for new_net, i, l in net.train_yield(inputs.groupby_bins('cases', NUM_BATCHES), labels.groupby_bins('cases', NUM_BATCHES), training_rate=5.0):
+    for new_net, count, _, _, _ in net.train_yield(inputs, labels, training_rate=5.0):
         if count % 20 == 0:
             plot_tensor_2D(new_net)
             plt.scatter(i.isel(inputs=0), i.isel(inputs=1), c=l.isel(labels=0))
             plt.show()
-        count += 1
 
 # should draw a 1D function and points, points should orient to match contour of function
 def test_1in_1out():
@@ -53,9 +51,8 @@ def test_1in_1out():
     np.random.shuffle(indexes)
     inputs = xr.DataArray(inputs[indexes].reshape((NUM_BATCHES*NUM_CASES, 1)), dims=('cases', 'inputs'))
     labels = xr.DataArray(labels[indexes].reshape((NUM_BATCHES*NUM_CASES, 1)), dims=('cases', 'labels'))
-    num = 0
-    for new_net, i, l in net.train_yield(inputs.groupby_bins('cases', NUM_BATCHES), labels.groupby_bins('cases', NUM_BATCHES), training_rate=3.0):
-        if num % 500 == 0:
+    for new_net, count, _, _, _ in net.train_yield(inputs, labels, training_rate=3.0):
+        if count % 500 == 0:
             x = np.linspace(0, 1, num=50)
             xgrid = xr.DataArray(x, dims=('cases'), coords={'cases': x}).expand_dims('inputs')
             net_outputs = new_net.output_only(new_net.pass_forward(xgrid)).squeeze()
@@ -65,7 +62,6 @@ def test_1in_1out():
             goal_outputs.plot()
             net_outputs.plot()
             plt.show()
-        num += 1
     NUM_TESTS = 100
     test_inputs = np.divide(np.arange(NUM_TESTS), NUM_TESTS)
     xarray_inputs = xr.DataArray(test_inputs.reshape((NUM_TESTS, 1)), dims=('cases', 'inputs'))

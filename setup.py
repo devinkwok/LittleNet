@@ -1,9 +1,9 @@
 from setuptools import setup
 
 setup(
-    name='littlenet',
+    name='LittleNet',
     version='0.1',
-    description='Simple neural network and tools',
+    description='A simple neural network with exploration tools',
     author='Devin Kwok',
     author_email='devin@devinkwok.com',
     packages=['littlenet'],

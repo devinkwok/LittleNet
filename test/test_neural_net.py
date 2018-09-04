@@ -188,9 +188,7 @@ class NeuralNetTest(unittest.TestCase):
             np.zeros((num_batches * NUM_CASES, INPUT_SIZE)), dims=[nn.DIM_CASE, nn.DIM_IN])
         labels = utility.make_onehot(xr.DataArray(
             np.zeros((num_batches * NUM_CASES,)), dims=[nn.DIM_CASE]), np.zeros(NUM_LABELS))
-        inputs = inputs.groupby_bins(nn.DIM_CASE, num_batches)
-        labels = labels.groupby_bins(nn.DIM_CASE, num_batches)
-        trained = net.train(list(inputs), list(labels))
+        trained = net.train(inputs, labels, batch_size=NUM_CASES)
         self.assert_dimensions(trained.matrices, nn.KEY_WEIGHT, {
                                nn.DIM_IN: LAYER_SIZES[:-1], nn.DIM_OUT: LAYER_SIZES[1:]})
         self.assert_dimensions(trained.matrices, nn.KEY_BIAS, {

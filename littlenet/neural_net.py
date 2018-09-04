@@ -279,7 +279,7 @@ class NeuralNet(object):
                                            self.matrices[mkey(i, KEY_WEIGHT)],
                                            dims=(DIM_IN)), self.matrices[mkey(i, KEY_BIAS)])
             activations[mkey(i+1, KEY_OUT_PRE)
-                       ] = pre_activation.rename({DIM_OUT: DIM_IN})
+                        ] = pre_activation.rename({DIM_OUT: DIM_IN})
             activations[mkey(i + 1, KEY_OUT_POST)] = self.func_activation(
                 pre_activation).rename({DIM_OUT: DIM_IN})
         return activations
@@ -336,52 +336,55 @@ class NeuralNet(object):
                 partial_d, self.matrices[mkey(i, KEY_WEIGHT)], dims=(DIM_OUT))
         return gradients
 
-    def train_yield(self, batch_inputs, batch_labels, training_rate=1.0, deep_copy=True):
+    def train_yield(self, train_inputs, train_labels, batch=1, rate=1.0, deep_copy=True):
         """Trains NeuralNet on a batch of inputs, iterating through each batch
 
         Arguments:
-            batch_inputs {iter(xarray[dims: DIM_CASE, DIM_IN])} -- multiple inputs
-                of same format as inputs to self.pass_forward(), grouped together along dim
-                DIM_CASE, use xarray.groupby() to generate
-            batch_labels {iter(xarray[dims: DIM_CASE, DIM_LABEL])} -- multiple labels
-                of same format as labels to self.pass_back(), grouped together along along dim
-                DIM_CASE, use xarray.groupby() to generate
+            train_inputs {iter(xarray[dims: DIM_CASE, DIM_IN])} -- multiple inputs
+                along DIM_CASE, of same format as inputs to self.pass_forward(), 
+            train_labels {iter(xarray[dims: DIM_CASE, DIM_LABEL])} -- multiple inputs
+                along DIM_CASE, of same format as inputs to self.pass_back()
 
         Keyword Arguments:
-            training_rate {float} -- training rate by which gradients are multiplied
+            batch {int} -- number of inputs per batch, net is trained once per batch
+                (default: {1})
+            rate {float} -- training rate by which gradients are multiplied
                 (default: {1.0})
             deep_copy {bool} -- whether to return a new object or modify existing object
                 (default: {False})
 
         Yields:
-            tuple(NeuralNet, xarray, xarray) -- tuple of NeuralNet in training,
-                inputs, labels used to train that iteration
+            tuple(NeuralNet, int, int, xarray, xarray) -- tuple of NeuralNet in training, number
+                of input cases trained, number of batches trained, inputs, and labels used in batch
         """
 
         new_net = self
         if deep_copy:
             new_net = copy.deepcopy(self)
-        for ins, lab in zip(batch_inputs, batch_labels):
-            inputs = ins[1]
-            labels = lab[1]
+        num_batches = int(train_inputs.sizes[DIM_CASE] / batch)
+        batch_inputs = train_inputs.groupby_bins(DIM_CASE, num_batches)
+        batch_labels = train_labels.groupby_bins(DIM_CASE, num_batches)
+        for batch_num, inputs_t, labels_t in zip(range(1, num_batches + 1), batch_inputs, batch_labels):
+            inputs = inputs_t[1]  # unpacking tuple returned by groupby object
+            labels = labels_t[1]  # unpacking tuple returned by groupby object
             gradients = new_net.pass_back(new_net.pass_forward(inputs), labels)
             for key in gradients.keys():
                 new_net.matrices[key] = np.add(new_net.matrices[key], np.multiply(
-                    gradients[key].mean(dim=DIM_CASE), training_rate))
-            yield new_net, inputs, labels
+                    gradients[key].mean(dim=DIM_CASE), rate))
+            yield new_net, batch_num * batch, batch_num, inputs, labels
 
-    def train(self, batch_inputs, batch_labels, training_rate=1.0, deep_copy=True):
-        """Same as self.train_yield(), but returns only the final result
+    def train(self, train_inputs, train_labels, batch_size=1, training_rate=1.0, deep_copy=True):
+        """Same as self.train_yield(), but returns only the final result.
 
         Arguments:
-            batch_inputs {iter(xarray[dims: DIM_CASE, DIM_IN])} -- multiple inputs
-                of same format as inputs to self.pass_forward(), grouped together along dim
-                DIM_CASE, use xarray.groupby() to generate
-            batch_labels {iter(xarray[dims: DIM_CASE, DIM_LABEL])} -- multiple labels
-                of same format as labels to self.pass_back(), grouped together along along dim
-                DIM_CASE, use xarray.groupby() to generate
+            train_inputs {iter(xarray[dims: DIM_CASE, DIM_IN])} -- multiple inputs
+                along DIM_CASE, of same format as inputs to self.pass_forward(), 
+            train_labels {iter(xarray[dims: DIM_CASE, DIM_LABEL])} -- multiple inputs
+                along DIM_CASE, of same format as inputs to self.pass_back()
 
         Keyword Arguments:
+            batch_size {int} -- number of inputs per batch, net is trained once per batch
+                (default: {1})
             training_rate {float} -- training rate by which gradients are multiplied
                 (default: {1.0})
             deep_copy {bool} -- whether to return a new object or modify existing object
@@ -391,11 +394,11 @@ class NeuralNet(object):
             NeuralNet -- trained NeuralNet
         """
 
-        items = None
-        for items in self.train_yield(batch_inputs, batch_labels,
-                                      training_rate, deep_copy=deep_copy):
+        new_net = None
+        for new_net, _, _, _, _ in self.train_yield(train_inputs, train_labels, batch=batch_size,
+                                      rate=training_rate, deep_copy=deep_copy):
             pass
-        return items[0]
+        return new_net
 
     def delete_neurons(self, neuron_indexes_per_layer, activations=None):
         """Removes neurons from the neural network

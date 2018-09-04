@@ -28,14 +28,17 @@ class UtilityTest(unittest.TestCase):
                                   inputs=(nn.DIM_Y, nn.DIM_X))
         img1 = util.rotate_images_90_deg(images)
         self.assertFalse(img1.equals(images))
+        np.testing.assert_allclose(img1.unstack(nn.DIM_IN).coords[nn.DIM_Y], np.arange(3))
         np.testing.assert_allclose(img1[0], [6, 3, 0, 7, 4, 1, 8, 5, 2])
         img2 = util.rotate_images_90_deg(images, num_clockwise=-3)
         np.testing.assert_allclose(img1, img2)
         img1 = util.rotate_images_90_deg(images, num_clockwise=3)
+        np.testing.assert_allclose(img1[0], [2, 5, 8, 1, 4, 7, 0, 3, 6])
         self.assertFalse(img1.equals(images))
         img2 = util.rotate_images_90_deg(images, num_clockwise=-1)
         np.testing.assert_allclose(img1, img2)
         img1 = util.rotate_images_90_deg(images, num_clockwise=2)
+        np.testing.assert_allclose(img1[0], [8, 7, 6, 5, 4, 3, 2, 1, 0])
         self.assertFalse(img1.equals(images))
         img2 = util.rotate_images_90_deg(images, num_clockwise=-2)
         np.testing.assert_allclose(img1, img2)
@@ -47,12 +50,15 @@ class UtilityTest(unittest.TestCase):
         img2 = util.flip_images_on_angle(images, topright_to_bottomleft=True)
         np.testing.assert_allclose(img1, [0, 3, 6, 1, 4, 7, 2, 5, 8])
         np.testing.assert_allclose(img2, [8, 5, 2, 7, 4, 1, 6, 3, 0])
+        np.testing.assert_allclose(img1.unstack(nn.DIM_IN).coords[nn.DIM_Y], np.arange(3))
 
     def test_flip_images(self):
         images = xr.DataArray(np.arange(27).reshape((3, 3, 3)),
                               dims=(nn.DIM_CASE, nn.DIM_Y, nn.DIM_X)).stack(
                                   inputs=(nn.DIM_Y, nn.DIM_X))
         img1 = util.flip_images(images)
+        print(img1)
+        np.testing.assert_allclose(img1.unstack(nn.DIM_IN).coords[nn.DIM_Y], np.arange(3))
         np.testing.assert_allclose(img1[0], [6, 7, 8, 3, 4, 5, 0, 1, 2])
         self.assertFalse(img1.equals(images))
         img2 = util.flip_images(img1)
@@ -66,6 +72,7 @@ class UtilityTest(unittest.TestCase):
         images = xr.DataArray(np.arange(16).reshape((4, 4)),
                               dims=(nn.DIM_Y, nn.DIM_X)).stack(inputs=(nn.DIM_Y, nn.DIM_X))
         img1 = util.quarter_images(images)
+        np.testing.assert_allclose(img1.unstack(nn.DIM_IN).coords[nn.DIM_Y], np.arange(4))
         np.testing.assert_allclose(
             img1, [10, 11, 8, 9, 14, 15, 12, 13, 2, 3, 0, 1, 6, 7, 4, 5])
 

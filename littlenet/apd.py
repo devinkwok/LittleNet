@@ -2,6 +2,7 @@
 APDs are non-parametric probability distributions of the intermediate outputs of a
 neural network. Currently APDs are modelled as histograms."""
 
+import copy
 import numpy as np
 import xarray as xr
 from littlenet import neural_net as nn
@@ -279,3 +280,63 @@ def diff_by_pairs(activations, labels, symbols=range(10), dim_to_pair=nn.DIM_IN,
                 apds.isel({dim_to_pair: j}), labels, symbols, dims_to_exclude=[dim_to_pair])
             pairs.append(diff(apd1, apd2))
     return xr.concat(pairs, DIM_PAIR)
+
+
+# TODO: this currently picks 1 neuron out of [num_to_search] neurons because of memory issues
+# change so that it picks [sizes] neurons at once out of [sizes] * [num_to_search]
+def build_culled_net_from_random(inputs, labels, sizes=(784, 30, 10),
+    num_to_search=100, dapd_by_labels=None, dapd_scale_factor=2, num_buckets=30):
+    
+    best_weights = []
+    best_biases = []
+    control_weights = []
+    control_biases = []
+    worst_weights = []
+    worst_biases = []
+    best_dapd, worst_dapd = None, None
+    # if set, use dapd to screen weights
+    if not dapd_by_labels is None:
+        best_dapd = cost(dapd_by_labels, dim='labels').stack(
+            inputs=('inputs_y', 'inputs_x')).reset_index('inputs', drop=True)
+        # normalize dapd
+        best_dapd =  best_dapd / np.amax(best_dapd) * dapd_scale_factor
+        worst_dapd = dapd_scale_factor - best_dapd
+    for neuron in range(sizes[1]):
+        print('Generating neuron', neuron, '...')
+        control_net = nn.NeuralNet((sizes[0], num_to_search))
+        net = control_net
+        # control
+        control = np.random.randint(num_to_search)
+        control_weights.append(net.matrices[nn.mkey(0, 'weights')].isel(neurons=control))
+        control_biases.append(net.matrices[nn.mkey(0, 'biases')].isel(neurons=control))
+        # best
+        if not dapd_by_labels is None:
+            net = copy.deepcopy(control_net)
+            net.matrices[nn.mkey(0, 'weights')] = net.matrices[nn.mkey(0, 'weights')] * best_dapd
+        activations = net.pass_forward(inputs)[nn.mkey(1, 'post_activation')]
+        dapd_per_neuron = cost(apd_area(diff_by_label(
+            activations, labels, num_buckets=num_buckets)), dim='labels')
+        best = np.argmax(dapd_per_neuron)
+        best_weights.append(net.matrices[nn.mkey(0, 'weights')].isel(neurons=best))
+        best_biases.append(net.matrices[nn.mkey(0, 'biases')].isel(neurons=best))
+        # worst
+        if not dapd_by_labels is None:
+            net = copy.deepcopy(control_net)
+            net.matrices[nn.mkey(0, 'weights')] = net.matrices[nn.mkey(0, 'weights')] * worst_dapd
+            activations = net.pass_forward(inputs)[nn.mkey(1, 'post_activation')]
+            dapd_per_neuron = cost(apd_area(diff_by_label(
+                activations, labels, num_buckets=num_buckets)), dim='labels')
+        worst = np.argmin(dapd_per_neuron)
+        worst_weights.append(net.matrices[nn.mkey(0, 'weights')].isel(neurons=worst))
+        worst_biases.append(net.matrices[nn.mkey(0, 'biases')].isel(neurons=worst))
+    net = nn.NeuralNet(sizes)
+    best_net = copy.deepcopy(net)
+    best_net.matrices[nn.mkey(0, 'weights')] = xr.concat(best_weights, dim='neurons').transpose('inputs', 'neurons')
+    best_net.matrices[nn.mkey(0, 'biases')] = xr.concat(best_biases, dim='neurons')
+    control_net = copy.deepcopy(net)
+    control_net.matrices[nn.mkey(0, 'weights')] = xr.concat(control_weights, dim='neurons').transpose('inputs', 'neurons')
+    control_net.matrices[nn.mkey(0, 'biases')] = xr.concat(control_biases, dim='neurons')
+    worst_net = copy.deepcopy(net)
+    worst_net.matrices[nn.mkey(0, 'weights')] = xr.concat(worst_weights, dim='neurons').transpose('inputs', 'neurons')
+    worst_net.matrices[nn.mkey(0, 'biases')] = xr.concat(worst_biases, dim='neurons')
+    return best_net, control_net, worst_net

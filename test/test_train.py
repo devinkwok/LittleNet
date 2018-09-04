@@ -40,8 +40,8 @@ class TrainTest(unittest.TestCase):
         self.assertFalse(np.all(np.equal(inputs, tiled_inputs.isel({nn.DIM_CASE: slice(50)}))))
 
     # def test_benchmark(self):
-    #     images = utility.read_idx_images('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-images.idx3-ubyte')
-    #     labels_onehot = utility.read_idx_labels('/home/devin/d/data/src/abstraction/mnist-toy-net/data/train-labels.idx1-ubyte')
+    #     images = utility.read_idx_images('./mnist_data/train-images.idx3-ubyte')
+    #     labels_onehot = utility.read_idx_labels('./mnist_data/train-labels.idx1-ubyte')
     #     labels_onehot = utility.make_onehot(labels_onehot, np.arange(10))
     #     net = nn.NeuralNet((784, 30, 10))
     #     inputs = images.isel(cases=slice(1000))

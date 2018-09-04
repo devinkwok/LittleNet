@@ -7,6 +7,7 @@ import copy
 import math
 import numpy as np
 import xarray as xr
+import matplotlib.pyplot as plt
 from littlenet import neural_net as nn
 
 
@@ -87,6 +88,41 @@ def make_onehot(label_xarray, symbols_list):
     return labels.transpose(*label_xarray.dims, nn.DIM_LABEL)
 
 
+def training_and_test_inputs(num_training=50000, num_tests=10000, is_onehot=True,
+            imagefile='./mnist_data/train-images.idx3-ubyte', labelfile='./mnist_data/train-labels.idx1-ubyte'):
+    """Convenience function for loading images and labels, separating inputs
+    into training and test cases.
+    
+    Keyword Arguments:
+        num_training {int} -- Number of training cases (default: {50000})
+        num_tests {int} -- Number of test cases (default: {10000})
+        make_onehot {bool} -- If true, returns onehot vectors for labels (default: {True})
+        imagefile {str} -- path to images (default: {'./mnist_data/train-images.idx3-ubyte'})
+        labelfile {str} -- path to labels (default: {'./mnist_data/train-labels.idx1-ubyte'})
+    
+    Raises:
+        ValueError -- Not enough inputs: num_training + num_tests
+            cannot be larger than the input dim nn.DIM_CASE
+    
+    Returns:
+        tuple(xarray, xarray, xarray, xarray) -- inputs, labels, test inputs, test labels
+    """
+
+
+    images = read_idx_images(imagefile)
+    labels = read_idx_labels(labelfile)
+    if num_training + num_tests > images.sizes[nn.DIM_CASE]:
+        raise ValueError('Not enough inputs:', num_training, '+', num_tests,
+                         'cannot be larger than the input dim nn.DIM_CASE')
+    if is_onehot:
+        labels = make_onehot(labels, np.arange(10))
+    train_inputs = images.isel(cases=slice(num_training))
+    train_labels = labels.isel(cases=slice(num_training))
+    test_inputs = images.isel(cases=slice(num_training, num_training + num_tests))
+    test_labels = labels.isel(cases=slice(num_training, num_training + num_tests))
+    return train_inputs, train_labels, test_inputs, test_labels
+
+
 def read_object(filename):
     """Convenience function for retrieving object from file using pickle.
 
@@ -111,12 +147,12 @@ def read_all_objects(directory='./', pattern='*', suffix='pyc'):
         suffix {str} -- filename suffix (default: {'pyc'})
 
     Returns:
-        list(object) -- list of objects from each file
+        list(tuple(str, object)) -- list of filenames, objects from each file
     """
 
     objs = []
-    for filename in glob.glob(directory + '/' + pattern + '.' + suffix):
-        objs.append((os.path.split(filename)[1], read_object(filename)))
+    for filename in glob.glob(os.path.join(directory, pattern + '.' + suffix)):
+        objs.append((os.path.splitext(os.path.basename(filename))[0], read_object(filename)))
     return objs
 
 
@@ -132,7 +168,7 @@ def write_object(obj, filename, directory='./', suffix='pyc'):
     """
     if not os.path.exists(directory):
         os.makedirs(directory)
-    with open(directory + '/' + filename + '.' + suffix, 'wb') as file:
+    with open(os.path.join(directory, filename + '.' + suffix), 'wb') as file:
         pickle.dump(obj, file)
 
 
@@ -294,6 +330,7 @@ def flip_images(images, dim=nn.DIM_Y, deep_copy=True):
 
     image_array = unstack_copy(images, deep_copy=deep_copy)
     image_array = image_array.isel({dim: slice(None, None, -1)})
+    image_array = image_array.assign_coords(**{dim: np.arange(image_array.sizes[dim])})
     return image_array.stack(inputs=(nn.DIM_Y, nn.DIM_X))
 
 
@@ -317,6 +354,8 @@ def quarter_images(images, deep_copy=True):
     x_size = math.floor(image_array.sizes[nn.DIM_X] / 2)
     y_size = math.floor(image_array.sizes[nn.DIM_Y] / 2)
     image_array = image_array.roll(**{nn.DIM_Y: y_size, nn.DIM_X: x_size})
+    image_array = image_array.assign_coords(**{nn.DIM_X: np.arange(image_array.sizes[nn.DIM_X])})
+    image_array = image_array.assign_coords(**{nn.DIM_Y: np.arange(image_array.sizes[nn.DIM_Y])})
     return image_array.stack(**{nn.DIM_IN: (nn.DIM_Y, nn.DIM_X)})
 
 
@@ -373,7 +412,31 @@ def tile_kernel(np_kernel, fill_dims=(28, 28), stride=(4, 4), tile_dim=nn.DIM_OU
     for i in range(0, fill_dims[0] - shape[0]+1, stride[0]):
         for j in range(0, fill_dims[1] - shape[1] + 1, stride[1]):
             tiles.append(kernel.roll(**{nn.DIM_Y: i, nn.DIM_X: j}))
-    return xr.concat(tiles, tile_dim).stack(inputs=(nn.DIM_Y, nn.DIM_X))
+    return xr.concat(tiles, tile_dim).stack(
+            inputs=(nn.DIM_Y, nn.DIM_X)).transpose(
+                nn.DIM_IN, nn.DIM_OUT).reset_index(nn.DIM_IN, drop=True)
+
+
+def build_kernel_net(width, falloff, stride, save_dir='./models/kernel'):
+    first_layer = tile_kernel(square_kernel(width, falloff), stride=stride)
+    neurons_in_first_layer = first_layer.sizes[nn.DIM_OUT]
+    kernel_net = nn.NeuralNet((784, neurons_in_first_layer, 10))
+    kernel_net.matrices[nn.mkey(0, nn.KEY_WEIGHT)] = first_layer
+    name = '_w' + str(width) + 'f' + str(falloff) \
+           + 's' + str(stride[0]) + 'x' + str(stride[1])
+    kernel_name = 'net_kernel' + name
+    rand_name = 'net_rand' + name
+    write_object(kernel_net, kernel_name, directory=save_dir)
+    rand_net = nn.NeuralNet((784, neurons_in_first_layer, 10))
+    write_object(rand_net, rand_name, directory=save_dir)
+    return (kernel_name, kernel_net), (rand_name, rand_net)
+
+
+def plot_first_layers(name_net_tuples):
+    for name, net in name_net_tuples:
+        print(name)
+        plot_layer_weights(net, layer=0, shape=(28, 28))
+        plt.show()
 
 
 def plot_layer_weights(neural_net, layer=0, shape=None):
