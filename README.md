@@ -46,8 +46,8 @@ python3 -m unittest discover
 Run experiment scripts if desired:
 
 ```
-python3 experiment-train.py
-python3 experiment-apd.py
+python3 experiment-init-kernel.py
+python3 experiment-init-apd.py
 ```
 
 Usage

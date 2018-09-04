@@ -57,7 +57,6 @@ class UtilityTest(unittest.TestCase):
                               dims=(nn.DIM_CASE, nn.DIM_Y, nn.DIM_X)).stack(
                                   inputs=(nn.DIM_Y, nn.DIM_X))
         img1 = util.flip_images(images)
-        print(img1)
         np.testing.assert_allclose(img1.unstack(nn.DIM_IN).coords[nn.DIM_Y], np.arange(3))
         np.testing.assert_allclose(img1[0], [6, 7, 8, 3, 4, 5, 0, 1, 2])
         self.assertFalse(img1.equals(images))
